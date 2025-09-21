@@ -18,7 +18,15 @@
     <!-- LEFT: Product Image + Thumbnails + Mobile Scroller -->
     <div class="product-image">
       <div class="product-thumbnails" id="pdp-productThumbnails"></div>
-      <img id="pdp-mainProductImage" src="" alt="Product"/>
+      <img
+        id="pdp-mainProductImage"
+        src=""
+        alt="Product image"
+        role="button"
+        tabindex="0"
+        aria-haspopup="dialog"
+        aria-label="Open image gallery"
+      />
       <!-- MOBILE: Horizontal image scroller -->
       <div class="mobile-image-strip" id="pdp-mobileImageStrip" aria-label="Product Images" tabindex="0"></div>
     </div>
@@ -187,24 +195,23 @@
       <!-- /Accordion -->
     </div>
   </div>
-
-  <div class="pdp-zoom" data-zoom-root>
-    <div class="pdp-zoom__lightbox" data-zoom-lightbox role="dialog" aria-modal="true" aria-hidden="true">
-      <div class="pdp-zoom__counter" data-zoom-counter aria-live="polite"></div>
-      <div class="pdp-zoom__controls">
-        <button type="button" class="pdp-zoom__btn" data-zoom-toggle aria-label="Zoom in">+</button>
-        <button type="button" class="pdp-zoom__btn" data-zoom-close aria-label="Close">×</button>
-    </div>
-    <div class="pdp-zoom__side-nav" data-zoom-nav>
-      <button type="button" class="pdp-zoom__btn" data-zoom-prev aria-label="Previous image">❮</button>
-      <button type="button" class="pdp-zoom__btn" data-zoom-next aria-label="Next image">❯</button>
-    </div>
-    <div class="pdp-zoom__dots" data-zoom-dots></div>
-    <div class="pdp-zoom__stage" data-zoom-stage>
-      <img class="pdp-zoom__image" data-zoom-image alt="">
+  <div class="pdp-zoom" aria-hidden="true">
+    <div class="pdp-lightbox" id="pdp-lightbox" role="dialog" aria-modal="true" aria-hidden="true">
+      <div class="counter" id="pdp-zoomCounter" aria-live="polite"></div>
+      <div class="controls">
+        <button class="btn" type="button" id="pdp-zoomToggle" aria-label="Zoom in">+</button>
+        <button class="btn" type="button" id="pdp-closeZoom" aria-label="Close">×</button>
+      </div>
+      <div class="side-nav">
+        <button class="btn" type="button" id="pdp-prevZoom" aria-label="Previous image">❮</button>
+        <button class="btn" type="button" id="pdp-nextZoom" aria-label="Next image">❯</button>
+      </div>
+      <div class="bottom" id="pdp-zoomDots"></div>
+      <div class="stage" id="pdp-zoomStage">
+        <img id="pdp-zoomedImage" class="pdp-zoom-image" alt="" />
+      </div>
     </div>
   </div>
-
 </section>
 
 <style>
@@ -213,8 +220,6 @@
     position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
     overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
   }
-
-  
 
   .pdp-scope body { font-family: 'Inter', sans-serif; }
   .pdp-scope .product-wrapper {
@@ -225,7 +230,17 @@
   .pdp-scope .product-thumbnails { display: flex; flex-direction: column; gap: 0.4rem; width: 20%; max-width: 60px; }
   .pdp-scope .thumbnail { aspect-ratio: 3/4; width: 100%; object-fit: cover; border: none; cursor: pointer; transition: outline 0.2s; }
   .pdp-scope .thumbnail.active { outline: 1px solid #000; outline-offset: 2px; }
-  .pdp-scope #pdp-mainProductImage { aspect-ratio: 4/5; width: 90%; object-fit: cover; display: block; cursor: zoom-in; }
+  .pdp-scope #pdp-mainProductImage {
+    aspect-ratio: 4/5;
+    width: 90%;
+    object-fit: cover;
+    display: block;
+    cursor: zoom-in;
+  }
+  .pdp-scope #pdp-mainProductImage:focus-visible {
+    outline: 2px solid #000;
+    outline-offset: 2px;
+  }
   .pdp-scope .mobile-image-strip { display: none; }
   .pdp-scope .product-form { flex: 0 0 50%; }
 
@@ -325,6 +340,25 @@
   .pdp-scope .accordion-content { padding: 0 0 1rem; font-size: 0.9rem; line-height: 1.4; color: #555; }
   .pdp-scope .accordion-content ul { margin: 0.5rem 0 0 1.25rem; }
 
+  @media (min-width: 1024px) {
+    .pdp-scope .product-image { position: sticky; top: 88px; }
+  }
+  @media (max-width: 768px) {
+    .pdp-scope .product-wrapper { flex-direction: column; padding: 1rem; }
+    .pdp-scope .product-image, .pdp-scope .product-form { width: 100%; }
+    .pdp-scope .product-thumbnails, .pdp-scope #pdp-mainProductImage { display: none !important; }
+    .pdp-scope .mobile-image-strip {
+      display: flex; flex-direction: row; overflow-x: auto; gap: 1rem;
+      scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; width: 100%;
+      border-radius: 0; margin-bottom: 1.5rem; padding-left: 0 !important; padding-right: 0 !important; scrollbar-width: none;
+    }
+    .pdp-scope .mobile-image-strip::-webkit-scrollbar { display: none !important; width: 0; height: 0; background: transparent; }
+    .pdp-scope .mobile-image-strip img {
+      flex: 0 0 75vw; width: 75vw; max-width: 75vw; object-fit: cover; aspect-ratio: 3/4;
+      scroll-snap-align: start; border: none; display: block; background: #fafafa;
+    }
+  }
+
   .pdp-scope .pdp-zoom {
     --pdp-zoom-btn-size: 38px;
     --pdp-zoom-btn-bg: #111;
@@ -334,18 +368,15 @@
     --pdp-zoom-dot: 10px;
     --pdp-zoom-ui-fade: 160ms;
   }
-
-  .pdp-scope .pdp-zoom__lightbox {
+  .pdp-scope .pdp-lightbox {
     position: fixed;
     inset: 0;
     background: #fff;
     display: none;
-    z-index: 40;
+    z-index: 999;
   }
-
-  .pdp-scope .pdp-zoom__lightbox.open { display: block; }
-
-  .pdp-scope .pdp-zoom__stage {
+  .pdp-scope .pdp-lightbox.open { display: block; }
+  .pdp-scope .pdp-lightbox .stage {
     position: absolute;
     inset: 0;
     display: flex;
@@ -354,8 +385,7 @@
     overflow: hidden;
     touch-action: none;
   }
-
-  .pdp-scope .pdp-zoom__image {
+  .pdp-scope .pdp-zoom-image {
     display: block;
     width: auto;
     height: auto;
@@ -365,24 +395,53 @@
     user-select: none;
     -webkit-user-drag: none;
     will-change: transform;
-    transition: transform .12s ease;
+    transition: transform 0.12s ease;
     transform-origin: 50% 50%;
   }
-
-  .pdp-scope .pdp-zoom__lightbox.dragging .pdp-zoom__image {
+  .pdp-scope .pdp-lightbox.dragging .pdp-zoom-image {
     cursor: grabbing;
     transition: none;
   }
-
-  .pdp-scope .pdp-zoom__controls,
-  .pdp-scope .pdp-zoom__side-nav,
-  .pdp-scope .pdp-zoom__dots,
-  .pdp-scope .pdp-zoom__counter {
+  .pdp-scope .pdp-lightbox .controls,
+  .pdp-scope .pdp-lightbox .side-nav,
+  .pdp-scope .pdp-lightbox .bottom,
+  .pdp-scope .pdp-lightbox .counter {
     position: absolute;
     z-index: 3;
   }
-
-  .pdp-scope .pdp-zoom__btn {
+  .pdp-scope .pdp-lightbox .controls {
+    top: var(--pdp-zoom-edge-gap);
+    right: var(--pdp-zoom-edge-gap);
+    display: flex;
+    gap: 10px;
+  }
+  .pdp-scope .pdp-lightbox .side-nav {
+    top: 50%;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    pointer-events: none;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 var(--pdp-zoom-edge-gap);
+  }
+  .pdp-scope .pdp-lightbox .side-nav .btn { pointer-events: auto; }
+  .pdp-scope .pdp-lightbox .counter {
+    top: var(--pdp-zoom-edge-gap);
+    left: var(--pdp-zoom-edge-gap);
+    font-size: 13px;
+    color: #111;
+    opacity: 0.7;
+  }
+  .pdp-scope .pdp-lightbox .bottom {
+    bottom: 16px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+  .pdp-scope .pdp-lightbox .btn {
     width: var(--pdp-zoom-btn-size);
     height: var(--pdp-zoom-btn-size);
     background: var(--pdp-zoom-btn-bg);
@@ -395,52 +454,12 @@
     font-size: 18px;
     line-height: 1;
     cursor: pointer;
-    transition: background .2s ease, transform .1s ease, opacity var(--pdp-zoom-ui-fade) ease;
-    box-shadow: 0 1px 3px rgba(0,0,0,.25);
+    transition: background 0.2s ease, transform 0.1s ease, opacity var(--pdp-zoom-ui-fade) ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   }
-
-  .pdp-scope .pdp-zoom__btn:hover { background: var(--pdp-zoom-btn-bg-hover); }
-
-  .pdp-scope .pdp-zoom__btn:active { transform: scale(.96); }
-
-  .pdp-scope .pdp-zoom__controls {
-    top: var(--pdp-zoom-edge-gap);
-    right: var(--pdp-zoom-edge-gap);
-    display: flex;
-    gap: 10px;
-  }
-
-  .pdp-scope .pdp-zoom__side-nav {
-    top: 50%;
-    left: 0;
-    right: 0;
-    transform: translateY(-50%);
-    pointer-events: none;
-    display: flex;
-    justify-content: space-between;
-    padding: 0 var(--pdp-zoom-edge-gap);
-  }
-
-  .pdp-scope .pdp-zoom__side-nav .pdp-zoom__btn { pointer-events: auto; }
-
-  .pdp-scope .pdp-zoom__counter {
-    top: var(--pdp-zoom-edge-gap);
-    left: var(--pdp-zoom-edge-gap);
-    font-size: 13px;
-    color: #111;
-    opacity: .7;
-  }
-
-  .pdp-scope .pdp-zoom__dots {
-    bottom: 16px;
-    left: 0;
-    right: 0;
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-  }
-
-  .pdp-scope .pdp-zoom__dot {
+  .pdp-scope .pdp-lightbox .btn:hover { background: var(--pdp-zoom-btn-bg-hover); }
+  .pdp-scope .pdp-lightbox .btn:active { transform: scale(0.96); }
+  .pdp-scope .pdp-lightbox .dot {
     width: var(--pdp-zoom-dot);
     height: var(--pdp-zoom-dot);
     border-radius: 50%;
@@ -449,36 +468,22 @@
     padding: 0;
     cursor: pointer;
   }
-
-  .pdp-scope .pdp-zoom__dot[aria-current="true"] { background: #111; }
-
-  .pdp-scope .pdp-zoom__lightbox.ui-hidden .pdp-zoom__btn,
-  .pdp-scope .pdp-zoom__lightbox.ui-hidden .pdp-zoom__side-nav .pdp-zoom__btn { opacity: 0; }
-
+  .pdp-scope .pdp-lightbox .dot[aria-current="true"] { background: #111; }
+  .pdp-scope .pdp-lightbox.ui-hidden .controls .btn,
+  .pdp-scope .pdp-lightbox.ui-hidden .side-nav .btn { opacity: 0; }
   @media (prefers-reduced-motion: reduce) {
-    .pdp-scope .pdp-zoom__btn,
-    .pdp-scope .pdp-zoom__image { transition: none !important; }
+    .pdp-scope .pdp-lightbox .btn,
+    .pdp-scope .pdp-zoom-image {
+      transition: none !important;
+    }
   }
 </style>
 
 <script type="module">
   const pdpRoot = document.querySelector('.pdp-scope');
-
-  if (pdpRoot) {
-    const zoom = createZoomLightbox(pdpRoot);
-    const mainImageEl = pdpRoot.querySelector('#pdp-mainProductImage');
-    const thumbsDiv = pdpRoot.querySelector('#pdp-productThumbnails');
-    const addToCartComponent = pdpRoot.querySelector('#pdp-addToCartComponent');
-    const mobileImageStrip = pdpRoot.querySelector('#pdp-mobileImageStrip');
-    const variantIdInput = pdpRoot.querySelector('#pdp-variantIdInput');
-    const swatchWrapper = pdpRoot.querySelector('#pdp-swatchWrapper');
-
-    if (mainImageEl) {
-      mainImageEl.setAttribute('tabindex', '0');
-      mainImageEl.setAttribute('role', 'button');
-      mainImageEl.setAttribute('aria-label', 'Open image gallery');
-    }
-
+  if (!pdpRoot) {
+    console.warn('PDP root not found for zoom integration.');
+  } else {
     const VARIANTS = [
       {
         id: "42445118799990",
@@ -518,119 +523,116 @@
       }
     ];
 
-    let currentVariant = null;
-    let currentImages = [];
-    let activeIndex = 0;
-    let mobileLastIndex = 0;
+    const swatchWrapper = pdpRoot.querySelector('#pdp-swatchWrapper');
+    const thumbsDiv = pdpRoot.querySelector('#pdp-productThumbnails');
+    const mainImage = pdpRoot.querySelector('#pdp-mainProductImage');
+    const mobileImageStrip = pdpRoot.querySelector('#pdp-mobileImageStrip');
+    const addToCartComponent = pdpRoot.querySelector('#pdp-addToCartComponent');
+    const variantIdInput = pdpRoot.querySelector('#pdp-variantIdInput');
 
-    function mapVariantImages(variant) {
-      return (variant?.images || []).map((src, idx) => ({
+    const zoom = createZoomLightbox(pdpRoot);
+    let currentVariantImages = [];
+    let currentImageIndex = 0;
+    const mainImageBaseAlt = (mainImage && mainImage.getAttribute('alt')) || 'Product image';
+
+    function normalizeVariantImages(variant) {
+      return (variant.images || []).map((src, i) => ({
         src,
-        alt: `${variant.title || 'Product'} image ${idx + 1}`
+        alt: `${variant.title} image ${i + 1}`
       }));
     }
 
-    function applyMainImage(index) {
-      if (!mainImageEl) return;
-      const image = currentImages[index];
-      if (!image) return;
-      mainImageEl.src = image.src;
-      mainImageEl.alt = image.alt || `Product image ${index + 1}`;
-      mainImageEl.setAttribute('aria-label', `Open image ${index + 1} of ${currentImages.length}`);
+    function setActiveImage(index) {
+      if (!currentVariantImages[index]) {
+        return;
+      }
+      currentImageIndex = index;
+      const item = currentVariantImages[index];
+      if (mainImage) {
+        mainImage.src = item.src;
+        mainImage.alt = item.alt || mainImageBaseAlt;
+      }
       if (addToCartComponent) {
-        addToCartComponent.dataset.productVariantMedia = image.src;
+        addToCartComponent.dataset.productVariantMedia = item.src;
       }
-    }
-
-    function setActiveThumbnail(index) {
-      if (!thumbsDiv) return;
-      thumbsDiv.querySelectorAll('.thumbnail').forEach((thumb, idx) => {
-        thumb.classList.toggle('active', idx === index);
-        thumb.setAttribute('aria-current', idx === index ? 'true' : 'false');
-      });
-    }
-
-    function selectImage(index, openerEl = null, { open = false } = {}) {
-      if (!currentImages.length) return;
-      const normalized = (index + currentImages.length) % currentImages.length;
-      activeIndex = normalized;
-      mobileLastIndex = normalized;
-      applyMainImage(normalized);
-      setActiveThumbnail(normalized);
-      if (open) {
-        zoom.openAt(normalized, openerEl);
+      if (thumbsDiv) {
+        const thumbs = thumbsDiv.querySelectorAll('.thumbnail');
+        thumbs.forEach((thumb, idx) => {
+          thumb.classList.toggle('active', idx === index);
+        });
       }
+      zoom.setActiveIndex(index);
     }
 
     function renderThumbnails(images) {
-      if (!thumbsDiv) return;
+      if (!thumbsDiv) {
+        return;
+      }
       thumbsDiv.innerHTML = '';
       images.forEach((image, i) => {
         const thumb = document.createElement('img');
-        thumb.className = 'thumbnail' + (i === activeIndex ? ' active' : '');
+        thumb.className = 'thumbnail' + (i === currentImageIndex ? ' active' : '');
         thumb.src = image.src;
         thumb.alt = image.alt || `Thumbnail ${i + 1}`;
         thumb.loading = i === 0 ? 'eager' : 'lazy';
         thumb.decoding = 'async';
-        thumb.tabIndex = 0;
-        thumb.setAttribute('role', 'button');
-        thumb.setAttribute('aria-current', i === activeIndex ? 'true' : 'false');
-        thumb.addEventListener('click', () => selectImage(i, thumb, { open: true }));
-        thumb.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            selectImage(i, thumb, { open: true });
-          }
+        thumb.draggable = false;
+        thumb.addEventListener('click', () => {
+          setActiveImage(i);
         });
+        thumb.addEventListener('dblclick', () => openZoomAt(i, thumb));
         thumbsDiv.appendChild(thumb);
       });
     }
 
     function renderMobileStrip(images) {
-      if (!mobileImageStrip) return;
+      if (!mobileImageStrip) {
+        return;
+      }
       mobileImageStrip.innerHTML = '';
       images.forEach((image, i) => {
         const img = document.createElement('img');
         img.src = image.src;
         img.loading = i === 0 ? 'eager' : 'lazy';
         img.decoding = 'async';
-        img.dataset.index = String(i);
-        img.alt = image.alt || `Product image ${i + 1}`;
+        img.draggable = false;
         img.setAttribute('role', 'group');
         img.setAttribute('aria-label', `Image ${i + 1} of ${images.length}`);
-        img.addEventListener('click', () => selectImage(i, img, { open: true }));
+        img.addEventListener('click', () => {
+          setActiveImage(i);
+          openZoomAt(i, img);
+        });
         mobileImageStrip.appendChild(img);
       });
     }
 
     function selectVariant(index) {
       const variant = VARIANTS[index];
-      if (!variant) return;
-      currentVariant = variant;
-      currentImages = mapVariantImages(variant);
-      activeIndex = 0;
-      mobileLastIndex = 0;
-
+      if (!variant) {
+        return;
+      }
       if (swatchWrapper) {
-        swatchWrapper.querySelectorAll('.swatch').forEach((sw, i) => {
-          sw.classList.toggle('selected', i === index);
+        swatchWrapper.querySelectorAll('.swatch').forEach((swatch, i) => {
+          swatch.classList.toggle('selected', i === index);
         });
       }
-
       if (variantIdInput) {
         variantIdInput.value = variant.id;
       }
+      currentVariantImages = normalizeVariantImages(variant);
+      currentImageIndex = 0;
+      renderThumbnails(currentVariantImages);
+      renderMobileStrip(currentVariantImages);
+      zoom.setImages(currentVariantImages);
+      setActiveImage(0);
+    }
 
-      renderThumbnails(currentImages);
-      renderMobileStrip(currentImages);
-      zoom.setImages(currentImages);
-
-      if (currentImages.length) {
-        selectImage(0);
-      } else if (mainImageEl) {
-        mainImageEl.removeAttribute('src');
-        mainImageEl.removeAttribute('aria-label');
+    function openZoomAt(index, opener) {
+      if (!currentVariantImages.length) {
+        return;
       }
+      const targetIndex = typeof index === 'number' ? index : currentImageIndex;
+      zoom.openAt(targetIndex, opener);
     }
 
     if (swatchWrapper) {
@@ -653,62 +655,64 @@
       });
     }
 
-    if (mainImageEl) {
-      mainImageEl.addEventListener('click', () => {
-        if (!currentImages.length) return;
-        zoom.openAt(activeIndex, mainImageEl);
-      });
-      mainImageEl.addEventListener('keydown', (event) => {
-        if (!currentImages.length) return;
+    selectVariant(0);
+
+    if (mainImage) {
+      mainImage.addEventListener('click', () => openZoomAt(currentImageIndex, mainImage));
+      mainImage.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          zoom.openAt(activeIndex, mainImageEl);
+          openZoomAt(currentImageIndex, mainImage);
         }
       });
     }
 
+    let qty = 1;
+    const qtyInput = pdpRoot.querySelector('#pdp-quantityInput');
+    const qtyValue = pdpRoot.querySelector('#pdp-qtyValue');
+    const qtyPlus = pdpRoot.querySelector('#pdp-qtyPlus');
+    const qtyMinus = pdpRoot.querySelector('#pdp-qtyMinus');
+    qtyPlus?.addEventListener('click', () => {
+      qty = Math.min(10, qty + 1);
+      if (qtyValue) qtyValue.textContent = String(qty);
+      if (qtyInput) qtyInput.value = String(qty);
+    });
+    qtyMinus?.addEventListener('click', () => {
+      qty = Math.max(1, qty - 1);
+      if (qtyValue) qtyValue.textContent = String(qty);
+      if (qtyInput) qtyInput.value = String(qty);
+    });
+
     if (mobileImageStrip) {
-      let scrollTimer = 0;
+      let lastIndex = 0;
+      let scrollTimeout = 0;
       mobileImageStrip.addEventListener('scroll', () => {
-        clearTimeout(scrollTimer);
-        scrollTimer = setTimeout(() => {
-          const imagesEls = Array.from(mobileImageStrip.querySelectorAll('img'));
-          if (!imagesEls.length) return;
-          const scrollLeft = mobileImageStrip.scrollLeft;
+        clearTimeout(scrollTimeout);
+        scrollTimeout = window.setTimeout(() => {
+          const images = Array.from(mobileImageStrip.querySelectorAll('img'));
+          if (!images.length) {
+            return;
+          }
+          const { scrollLeft } = mobileImageStrip;
           let minDist = Infinity;
-          let newIndex = 0;
-          imagesEls.forEach((img, idx) => {
+          let activeIndex = 0;
+          images.forEach((img, idx) => {
             const dist = Math.abs(img.offsetLeft - scrollLeft);
             if (dist < minDist) {
               minDist = dist;
-              newIndex = idx;
+              activeIndex = idx;
             }
           });
-          if (newIndex !== mobileLastIndex) {
-            selectImage(newIndex, imagesEls[newIndex], { open: false });
+          if (activeIndex !== lastIndex) {
+            lastIndex = activeIndex;
+            setActiveImage(activeIndex);
           }
         }, 100);
       });
     }
 
-    selectVariant(0);
-
-    let qty = 1;
-    const qtyInput = pdpRoot.querySelector('#pdp-quantityInput');
-    const qtyValue = pdpRoot.querySelector('#pdp-qtyValue');
-    pdpRoot.querySelector('#pdp-qtyPlus').addEventListener('click', () => {
-      qty = Math.min(10, qty + 1);
-      qtyValue.textContent = qty;
-      qtyInput.value = qty;
-    });
-    pdpRoot.querySelector('#pdp-qtyMinus').addEventListener('click', () => {
-      qty = Math.max(1, qty - 1);
-      qtyValue.textContent = qty;
-      qtyInput.value = qty;
-    });
-
     const accordionContainer = pdpRoot.querySelector('.product-details-accordion');
-  if (accordionContainer) {
+    if (accordionContainer) {
       const allowMultiple = true;
       const accordions = accordionContainer.querySelectorAll('.accordion');
 
@@ -775,382 +779,368 @@
       const firstAccordion = accordions[0];
       if (firstAccordion) openAcc(firstAccordion);
     }
-  }
 
-  function createZoomLightbox(rootEl) {
-    const zoomRoot = rootEl?.querySelector('[data-zoom-root]');
-    if (!zoomRoot) {
-      return { setImages: () => {}, openAt: () => {} };
-    }
+    function createZoomLightbox(scope) {
 
-    const lightbox = zoomRoot.querySelector('[data-zoom-lightbox]');
-    const stage = zoomRoot.querySelector('[data-zoom-stage]');
-    const zoomedImage = zoomRoot.querySelector('[data-zoom-image]');
-    const zoomToggle = zoomRoot.querySelector('[data-zoom-toggle]');
+      const lightbox = scope.querySelector('#pdp-lightbox');
+      const stage = scope.querySelector('#pdp-zoomStage');
+      const zoomedImage = scope.querySelector('#pdp-zoomedImage');
+      const zoomToggle = scope.querySelector('#pdp-zoomToggle');
+      const closeBtn = scope.querySelector('#pdp-closeZoom');
+      const prevBtn = scope.querySelector('#pdp-prevZoom');
+      const nextBtn = scope.querySelector('#pdp-nextZoom');
+      const dotsWrap = scope.querySelector('#pdp-zoomDots');
+      const counter = scope.querySelector('#pdp-zoomCounter');
 
-    if (!lightbox || !stage || !zoomedImage || !zoomToggle) {
-      return { setImages: () => {}, openAt: () => {} };
-    }
-
-    const body = document.body;
-    const closeBtn = zoomRoot.querySelector('[data-zoom-close]');
-    const prevBtn = zoomRoot.querySelector('[data-zoom-prev]');
-    const nextBtn = zoomRoot.querySelector('[data-zoom-next]');
-    const dotsWrap = zoomRoot.querySelector('[data-zoom-dots]');
-    const counter = zoomRoot.querySelector('[data-zoom-counter]');
-    const sideNav = zoomRoot.querySelector('[data-zoom-nav]');
-
-    const state = { scale: 1, min: 1, max: 4, tx: 0, ty: 0, baseW: 0, baseH: 0, viewW: 0, viewH: 0 };
-    const viewer = { index: 0, isOpen: false, openerEl: null };
-    const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
-    const pts = new Map();
-    let pinchStart = null;
-    let raf = null;
-    let idleTimer = null;
-    let startDrag = null;
-    let images = [];
-
-    const apply = () => {
-      zoomedImage.style.transform = `translate3d(${state.tx}px,${state.ty}px,0) scale(${state.scale})`;
-      const needsReset = state.scale > 1.01 || Math.abs(state.tx) > 1 || Math.abs(state.ty) > 1;
-      zoomToggle.textContent = needsReset ? '−' : '+';
-      zoomToggle.setAttribute('aria-label', needsReset ? 'Reset zoom' : 'Zoom in');
-    };
-
-    const schedule = () => {
-      if (!raf) {
-        raf = requestAnimationFrame(() => {
-          raf = null;
-          clampPan();
-          apply();
-        });
-      }
-    };
-
-    function measureBase() {
-      const prev = zoomedImage.style.transform;
-      zoomedImage.style.transform = 'translate3d(0,0,0) scale(1)';
-      const r = zoomedImage.getBoundingClientRect();
-      const s = stage.getBoundingClientRect();
-      state.baseW = r.width;
-      state.baseH = r.height;
-      state.viewW = s.width;
-      state.viewH = s.height;
-      zoomedImage.style.transform = prev;
-      if (zoomedImage.naturalWidth && state.baseW) {
-        const limitW = zoomedImage.naturalWidth / state.baseW;
-        const limitH = zoomedImage.naturalHeight / state.baseH;
-        state.max = Math.max(1, Math.min(4, limitW, limitH));
-      }
-    }
-
-    function clampPan() {
-      const contentW = state.baseW * state.scale;
-      const contentH = state.baseH * state.scale;
-      const maxX = Math.max(0, (contentW - state.viewW) / 2);
-      const maxY = Math.max(0, (contentH - state.viewH) / 2);
-      state.tx = clamp(state.tx, -maxX, maxX);
-      state.ty = clamp(state.ty, -maxY, maxY);
-    }
-
-    function zoomAt(cx, cy, nextScale) {
-      nextScale = clamp(nextScale, state.min, state.max);
-      const prev = state.scale;
-      if (nextScale === prev) return;
-      state.tx = cx - (cx - state.tx) * (nextScale / prev);
-      state.ty = cy - (cy - state.ty) * (nextScale / prev);
-      state.scale = nextScale;
-      schedule();
-    }
-
-    function resetView() {
-      state.scale = 1;
-      state.tx = 0;
-      state.ty = 0;
-      schedule();
-    }
-
-    function showUI() {
-      lightbox.classList.remove('ui-hidden');
-      clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => lightbox.classList.add('ui-hidden'), 1600);
-    }
-
-    function setNavAvailability() {
-      const hasMultiple = images.length > 1;
-      if (prevBtn) prevBtn.disabled = !hasMultiple;
-      if (nextBtn) nextBtn.disabled = !hasMultiple;
-      if (sideNav) sideNav.hidden = !hasMultiple;
-      if (dotsWrap) dotsWrap.hidden = !hasMultiple;
-    }
-
-    function buildDots() {
-      if (!dotsWrap) return;
-      dotsWrap.innerHTML = '';
-      images.forEach((_, i) => {
-        const dot = document.createElement('button');
-        dot.type = 'button';
-        dot.className = 'pdp-zoom__dot';
-        dot.setAttribute('aria-label', `Go to image ${i + 1}`);
-        dot.addEventListener('click', () => setSlide(i));
-        dotsWrap.appendChild(dot);
-      });
-    }
-
-    function setSlide(i) {
-      if (!images.length) return;
-      viewer.index = (i + images.length) % images.length;
-      const item = images[viewer.index];
-      zoomedImage.alt = item.alt || '';
-      zoomedImage.removeAttribute('srcset');
-      zoomedImage.removeAttribute('sizes');
-      zoomedImage.src = item.src;
-      if (counter) {
-        counter.textContent = `${viewer.index + 1} / ${images.length}`;
-      }
-      if (dotsWrap) {
-        [...dotsWrap.children].forEach((btn, idx) => {
-          btn.setAttribute('aria-current', idx === viewer.index ? 'true' : 'false');
-        });
-      }
-      if (images.length > 1) {
-        [viewer.index - 1, viewer.index + 1].forEach((ii) => {
-          const j = (ii + images.length) % images.length;
-          const preload = new Image();
-          preload.src = images[j].src;
-        });
-      }
-      if (zoomedImage.complete && zoomedImage.naturalWidth > 0) {
-        measureBase();
-        resetView();
-      } else {
-        zoomedImage.onload = () => {
-          measureBase();
-          resetView();
-          zoomedImage.onload = null;
+      if (!lightbox || !stage || !zoomedImage || !zoomToggle || !closeBtn || !prevBtn || !nextBtn || !dotsWrap || !counter) {
+        return {
+          setImages() {},
+          openAt() {},
+          setActiveIndex() {}
         };
       }
-      showUI();
-    }
 
-    function openAt(i, opener) {
-      if (!images.length) return;
-      const targetIndex = (i + images.length) % images.length;
-      const wasOpen = viewer.isOpen;
-      viewer.openerEl = opener || viewer.openerEl || null;
-      if (!wasOpen) {
+      const body = document.body;
+      const state = { scale: 1, min: 1, max: 4, tx: 0, ty: 0, baseW: 0, baseH: 0, viewW: 0, viewH: 0 };
+      const viewer = { index: 0, isOpen: false };
+      const pts = new Map();
+      const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
+      let images = [];
+      let pinchStart = null;
+      let raf = null;
+      let idleTimer = null;
+      let startDrag = null;
+      let focusables = [];
+      let firstEl = null;
+      let lastEl = null;
+      let prevActive = null;
+
+      const apply = () => {
+        zoomedImage.style.transform = `translate3d(${state.tx}px, ${state.ty}px, 0) scale(${state.scale})`;
+        const needsReset = (state.scale > 1.01 || Math.abs(state.tx) > 1 || Math.abs(state.ty) > 1);
+        zoomToggle.textContent = needsReset ? '−' : '+';
+        zoomToggle.setAttribute('aria-label', needsReset ? 'Reset zoom' : 'Zoom in');
+      };
+
+      const clampPan = () => {
+        const contentW = state.baseW * state.scale;
+        const contentH = state.baseH * state.scale;
+        const maxX = Math.max(0, (contentW - state.viewW) / 2);
+        const maxY = Math.max(0, (contentH - state.viewH) / 2);
+        state.tx = clamp(state.tx, -maxX, maxX);
+        state.ty = clamp(state.ty, -maxY, maxY);
+      };
+
+      const schedule = () => {
+        if (!raf) {
+          raf = requestAnimationFrame(() => {
+            raf = null;
+            clampPan();
+            apply();
+          });
+        }
+      };
+
+      function measureBase() {
+        const prev = zoomedImage.style.transform;
+        zoomedImage.style.transform = 'translate3d(0,0,0) scale(1)';
+        const rect = zoomedImage.getBoundingClientRect();
+        const stageRect = stage.getBoundingClientRect();
+        state.baseW = rect.width;
+        state.baseH = rect.height;
+        state.viewW = stageRect.width;
+        state.viewH = stageRect.height;
+        zoomedImage.style.transform = prev;
+        if (zoomedImage.naturalWidth && state.baseW) {
+          const limitW = zoomedImage.naturalWidth / state.baseW;
+          const limitH = zoomedImage.naturalHeight / state.baseH;
+          state.max = Math.max(1, Math.min(4, limitW, limitH));
+        }
+      }
+
+      const showUI = () => {
+        lightbox.classList.remove('ui-hidden');
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => lightbox.classList.add('ui-hidden'), 1600);
+      };
+
+      function buildDots() {
+        dotsWrap.innerHTML = '';
+        images.forEach((_, i) => {
+          const dot = document.createElement('button');
+          dot.type = 'button';
+          dot.className = 'dot';
+          dot.setAttribute('aria-label', `Go to image ${i + 1}`);
+          dot.addEventListener('click', () => setSlide(i));
+          dotsWrap.appendChild(dot);
+        });
+      }
+
+      function updateDots() {
+        const children = dotsWrap.children;
+        for (let i = 0; i < children.length; i += 1) {
+          children[i].setAttribute('aria-current', i === viewer.index ? 'true' : 'false');
+        }
+      }
+
+      function resetView() {
+        state.scale = 1;
+        state.tx = 0;
+        state.ty = 0;
+        schedule();
+      }
+
+      function zoomAt(cx, cy, nextScale) {
+        const target = clamp(nextScale, state.min, state.max);
+        const prevScale = state.scale;
+        if (target === prevScale) return;
+        state.tx = cx - (cx - state.tx) * (target / prevScale);
+        state.ty = cy - (cy - state.ty) * (target / prevScale);
+        state.scale = target;
+        schedule();
+      }
+
+      function setSlide(index) {
+        if (!images.length) {
+          return;
+        }
+        viewer.index = (index + images.length) % images.length;
+        const item = images[viewer.index];
+        zoomedImage.alt = item.alt || '';
+        zoomedImage.removeAttribute('srcset');
+        zoomedImage.removeAttribute('sizes');
+        if (zoomedImage.src !== item.src) {
+          zoomedImage.src = item.src;
+        }
+        counter.textContent = `${viewer.index + 1} / ${images.length}`;
+        updateDots();
+        [viewer.index - 1, viewer.index + 1].forEach((ii) => {
+          const neighbor = images[(ii + images.length) % images.length];
+          if (neighbor) {
+            const preload = new Image();
+            preload.src = neighbor.src;
+          }
+        });
+        if (zoomedImage.complete && zoomedImage.naturalWidth > 0) {
+          measureBase();
+          resetView();
+        } else {
+          zoomedImage.onload = () => {
+            measureBase();
+            resetView();
+            zoomedImage.onload = null;
+          };
+        }
+        showUI();
+      }
+
+      function openLightbox(index, opener) {
+        if (!images.length) {
+          return;
+        }
         viewer.isOpen = true;
         lightbox.classList.add('open');
-        lightbox.classList.remove('ui-hidden', 'dragging');
         lightbox.setAttribute('aria-hidden', 'false');
         body.dataset.prevOverflow = body.style.overflow || '';
         body.style.overflow = 'hidden';
+        prevActive = opener || document.activeElement;
+        setSlide(index);
         trapFocus();
         zoomToggle.focus();
       }
-      setSlide(targetIndex);
-    }
 
-    function close() {
-      if (!viewer.isOpen) return;
-      viewer.isOpen = false;
-      lightbox.classList.remove('open', 'ui-hidden', 'dragging');
-      lightbox.setAttribute('aria-hidden', 'true');
-      body.style.overflow = body.dataset.prevOverflow || '';
-      pts.clear();
-      pinchStart = null;
-      startDrag = null;
-      clearTimeout(idleTimer);
-      releaseFocus();
-      viewer.openerEl?.focus?.();
-    }
-
-    closeBtn?.addEventListener('click', close);
-
-    zoomToggle.addEventListener('click', () => {
-      if (state.scale > 1.01 || Math.abs(state.tx) > 1 || Math.abs(state.ty) > 1) {
-        resetView();
-      } else {
-        zoomAt(0, 0, Math.min(2, state.max));
+      function closeLightbox() {
+        viewer.isOpen = false;
+        lightbox.classList.remove('open', 'ui-hidden', 'dragging');
+        lightbox.setAttribute('aria-hidden', 'true');
+        body.style.overflow = body.dataset.prevOverflow || '';
+        pts.clear();
+        pinchStart = null;
+        startDrag = null;
+        clearTimeout(idleTimer);
+        releaseFocus();
       }
-    });
 
-    prevBtn?.addEventListener('click', () => setSlide(viewer.index - 1));
-    nextBtn?.addEventListener('click', () => setSlide(viewer.index + 1));
-    lightbox.addEventListener('mousemove', showUI);
-    lightbox.addEventListener('click', (event) => {
-      if (event.target === lightbox) close();
-    });
+      closeBtn.addEventListener('click', closeLightbox);
+      zoomToggle.addEventListener('click', () => {
+        if (state.scale > 1.01 || Math.abs(state.tx) > 1 || Math.abs(state.ty) > 1) {
+          resetView();
+        } else {
+          zoomAt(0, 0, Math.min(2, state.max));
+        }
+      });
+      prevBtn.addEventListener('click', () => setSlide(viewer.index - 1));
+      nextBtn.addEventListener('click', () => setSlide(viewer.index + 1));
 
-    window.addEventListener('keydown', (event) => {
-      if (!viewer.isOpen) return;
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        close();
-      } else if (event.key === 'ArrowRight') {
-        event.preventDefault();
-        setSlide(viewer.index + 1);
-      } else if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        setSlide(viewer.index - 1);
-      } else if (event.key === '+' || (event.key === '=' && (event.ctrlKey || event.metaKey))) {
-        event.preventDefault();
-        zoomAt(0, 0, state.scale * 1.25);
-      } else if (event.key === '-' || (event.key === '_' && (event.ctrlKey || event.metaKey))) {
-        event.preventDefault();
-        zoomAt(0, 0, state.scale / 1.25);
-      }
-    });
+      lightbox.addEventListener('mousemove', showUI);
+      lightbox.addEventListener('click', (event) => {
+        if (event.target === lightbox) closeLightbox();
+      });
 
-    stage.addEventListener('dblclick', (event) => {
-      const rect = stage.getBoundingClientRect();
-      const cx = event.clientX - (rect.left + rect.width / 2);
-      const cy = event.clientY - (rect.top + rect.height / 2);
-      const target = state.scale > 1 ? 1 : Math.min(2, state.max);
-      zoomAt(cx, cy, target);
-    });
+      window.addEventListener('keydown', (event) => {
+        if (!viewer.isOpen) return;
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeLightbox();
+        } else if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          setSlide(viewer.index + 1);
+        } else if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          setSlide(viewer.index - 1);
+        } else if (event.key === '+' || (event.key === '=' && (event.ctrlKey || event.metaKey))) {
+          event.preventDefault();
+          zoomAt(0, 0, state.scale * 1.25);
+        } else if (event.key === '-' || (event.key === '_' && (event.ctrlKey || event.metaKey))) {
+          event.preventDefault();
+          zoomAt(0, 0, state.scale / 1.25);
+        }
+      });
 
-    stage.addEventListener('pointerdown', (event) => {
-      if (!viewer.isOpen) return;
-      stage.setPointerCapture(event.pointerId);
-      pts.set(event.pointerId, { x: event.clientX, y: event.clientY });
-      if (pts.size === 1) {
-        startDrag = { x: event.clientX, y: event.clientY, atScale: state.scale };
-      }
-      if (pts.size === 2) {
-        const [a, b] = [...pts.values()];
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const dist = Math.hypot(dx, dy);
+      stage.addEventListener('dblclick', (event) => {
         const rect = stage.getBoundingClientRect();
-        const cx = (a.x + b.x) / 2 - (rect.left + rect.width / 2);
-        const cy = (a.y + b.y) / 2 - (rect.top + rect.height / 2);
-        pinchStart = { dist, scale: state.scale, cx, cy };
+        const cx = event.clientX - (rect.left + rect.width / 2);
+        const cy = event.clientY - (rect.top + rect.height / 2);
+        const targetScale = state.scale > 1 ? 1 : Math.min(2, state.max);
+        zoomAt(cx, cy, targetScale);
+      });
+
+      stage.addEventListener('pointerdown', (event) => {
+        if (!viewer.isOpen) return;
+        stage.setPointerCapture(event.pointerId);
+        pts.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (pts.size === 1) {
+          startDrag = { x: event.clientX, y: event.clientY, atScale: state.scale };
+        }
+        if (pts.size === 2) {
+          const [a, b] = [...pts.values()];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.hypot(dx, dy);
+          const rect = stage.getBoundingClientRect();
+          const cx = (a.x + b.x) / 2 - (rect.left + rect.width / 2);
+          const cy = (a.y + b.y) / 2 - (rect.top + rect.height / 2);
+          pinchStart = { dist, scale: state.scale, cx, cy };
+        }
+        lightbox.classList.add('dragging');
+        showUI();
+      });
+
+      stage.addEventListener('pointermove', (event) => {
+        if (!pts.has(event.pointerId)) return;
+        const previous = pts.get(event.pointerId);
+        const current = { x: event.clientX, y: event.clientY };
+        pts.set(event.pointerId, current);
+
+        if (pts.size === 1) {
+          if (state.scale === 1 && startDrag) {
+            const dx = current.x - startDrag.x;
+            const dy = current.y - startDrag.y;
+            if (Math.abs(dx) > 48 && Math.abs(dy) < 40) {
+              setSlide(viewer.index + (dx < 0 ? 1 : -1));
+              startDrag = { x: current.x, y: current.y, atScale: 1 };
+              return;
+            }
+          }
+          state.tx += current.x - previous.x;
+          state.ty += current.y - previous.y;
+          schedule();
+        } else if (pts.size === 2 && pinchStart) {
+          const [a, b] = [...pts.values()];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.hypot(dx, dy);
+          const nextScale = clamp(pinchStart.scale * (dist / pinchStart.dist), state.min, state.max);
+          zoomAt(pinchStart.cx, pinchStart.cy, nextScale);
+        }
+      }, { passive: false });
+
+      const endPointer = (event) => {
+        if (!pts.has(event.pointerId)) return;
+        pts.delete(event.pointerId);
+        if (pts.size < 2) pinchStart = null;
+        if (!pts.size) {
+          lightbox.classList.remove('dragging');
+          startDrag = null;
+        }
+      };
+      stage.addEventListener('pointerup', endPointer);
+      stage.addEventListener('pointercancel', endPointer);
+      stage.addEventListener('pointerleave', endPointer);
+
+      stage.addEventListener('wheel', (event) => {
+        if (!viewer.isOpen) return;
+        event.preventDefault();
+        const factor = Math.exp(-event.deltaY * 0.0015);
+        const rect = stage.getBoundingClientRect();
+        const cx = event.clientX - (rect.left + rect.width / 2);
+        const cy = event.clientY - (rect.top + rect.height / 2);
+        zoomAt(cx, cy, state.scale * factor);
+        showUI();
+      }, { passive: false });
+
+      new ResizeObserver(() => {
+        if (viewer.isOpen) {
+          measureBase();
+          schedule();
+        }
+      }).observe(stage);
+
+      function trapFocus() {
+        focusables = [...lightbox.querySelectorAll('button,[href],[tabindex]:not([tabindex="-1"])')];
+        firstEl = focusables[0] || null;
+        lastEl = focusables[focusables.length - 1] || null;
+        lightbox.addEventListener('keydown', focusTrapHandler);
       }
-      lightbox.classList.add('dragging');
-      showUI();
-    });
 
-    stage.addEventListener('pointermove', (event) => {
-      if (!pts.has(event.pointerId)) return;
-      const prev = pts.get(event.pointerId);
-      const now = { x: event.clientX, y: event.clientY };
-      pts.set(event.pointerId, now);
+      function focusTrapHandler(event) {
+        if (event.key !== 'Tab' || focusables.length === 0) return;
+        if (event.shiftKey && document.activeElement === firstEl) {
+          event.preventDefault();
+          lastEl?.focus();
+        } else if (!event.shiftKey && document.activeElement === lastEl) {
+          event.preventDefault();
+          firstEl?.focus();
+        }
+      }
 
-      if (pts.size === 1) {
-        if (state.scale === 1 && startDrag) {
-          const dx = now.x - startDrag.x;
-          const dy = now.y - startDrag.y;
-          if (Math.abs(dx) > 48 && Math.abs(dy) < 40) {
-            setSlide(viewer.index + (dx < 0 ? 1 : -1));
-            startDrag = { x: now.x, y: now.y, atScale: 1 };
+      function releaseFocus() {
+        lightbox.removeEventListener('keydown', focusTrapHandler);
+        prevActive?.focus?.();
+      }
+
+      return {
+        setImages(list) {
+          images = (list || []).filter((item) => item && item.src);
+          viewer.index = 0;
+          buildDots();
+          if (!images.length) {
+            zoomedImage.removeAttribute('src');
+            counter.textContent = '';
             return;
           }
-        }
-        state.tx += now.x - prev.x;
-        state.ty += now.y - prev.y;
-        schedule();
-      } else if (pts.size === 2 && pinchStart) {
-        const [a, b] = [...pts.values()];
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const dist = Math.hypot(dx, dy);
-        const next = clamp(pinchStart.scale * (dist / pinchStart.dist), state.min, state.max);
-        zoomAt(pinchStart.cx, pinchStart.cy, next);
-      }
-    }, { passive: false });
-
-    const end = (event) => {
-      if (!pts.has(event.pointerId)) return;
-      pts.delete(event.pointerId);
-      if (pts.size < 2) pinchStart = null;
-      if (pts.size === 0) {
-        lightbox.classList.remove('dragging');
-        startDrag = null;
-      }
-    };
-
-    stage.addEventListener('pointerup', end);
-    stage.addEventListener('pointercancel', end);
-    stage.addEventListener('pointerleave', end);
-
-    stage.addEventListener('wheel', (event) => {
-      if (!viewer.isOpen) return;
-      event.preventDefault();
-      const factor = Math.exp(-event.deltaY * 0.0015);
-      const rect = stage.getBoundingClientRect();
-      const cx = event.clientX - (rect.left + rect.width / 2);
-      const cy = event.clientY - (rect.top + rect.height / 2);
-      zoomAt(cx, cy, state.scale * factor);
-      showUI();
-    }, { passive: false });
-
-    new ResizeObserver(() => {
-      if (viewer.isOpen) {
-        measureBase();
-        schedule();
-      }
-    }).observe(stage);
-
-    let focusables = [];
-    let firstEl = null;
-    let lastEl = null;
-    let prevActive = null;
-
-    function trapFocus() {
-      prevActive = document.activeElement;
-      focusables = [...lightbox.querySelectorAll('button,[href],[tabindex]:not([tabindex="-1"])')];
-      firstEl = focusables[0];
-      lastEl = focusables[focusables.length - 1];
-      lightbox.addEventListener('keydown', trapper);
-    }
-
-    function trapper(event) {
-      if (event.key !== 'Tab') return;
-      if (event.shiftKey && document.activeElement === firstEl) {
-        event.preventDefault();
-        lastEl?.focus?.();
-      } else if (!event.shiftKey && document.activeElement === lastEl) {
-        event.preventDefault();
-        firstEl?.focus?.();
-      }
-    }
-
-    function releaseFocus() {
-      lightbox.removeEventListener('keydown', trapper);
-      prevActive?.focus?.();
-    }
-
-    function setImages(nextImages) {
-      const prevIndex = viewer.index || 0;
-      images = Array.isArray(nextImages) ? nextImages.filter((img) => !!img?.src) : [];
-      setNavAvailability();
-      buildDots();
-      if (!images.length) {
-        viewer.index = 0;
-        if (counter) counter.textContent = '';
-        return viewer.isOpen ? close() : undefined;
-      }
-      viewer.index = Math.min(prevIndex, images.length - 1);
-      if (viewer.isOpen) {
-        setSlide(viewer.index);
-      } else {
-        zoomToggle.textContent = '+';
-        zoomToggle.setAttribute('aria-label', 'Zoom in');
-        if (counter) {
+          updateDots();
+          counter.textContent = `${viewer.index + 1} / ${images.length}`;
+          if (viewer.isOpen) {
+            setSlide(viewer.index);
+          }
+        },
+        openAt(index, opener) {
+          const targetIndex = typeof index === 'number' ? index : viewer.index;
+          openLightbox(targetIndex, opener);
+        },
+        setActiveIndex(index) {
+          if (!images.length) {
+            viewer.index = 0;
+            counter.textContent = '';
+            return;
+          }
+          viewer.index = (index + images.length) % images.length;
+          updateDots();
           counter.textContent = `${viewer.index + 1} / ${images.length}`;
         }
-        if (dotsWrap) {
-          [...dotsWrap.children].forEach((dot, idx) => {
-            dot.setAttribute('aria-current', idx === viewer.index ? 'true' : 'false');
-          });
-        }
-      }
+      };
     }
-
-    return {
-      setImages,
-      openAt: (index, opener) => openAt(index ?? viewer.index, opener)
-    };
   }
 </script>
+
