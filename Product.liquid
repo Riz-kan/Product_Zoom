@@ -199,12 +199,30 @@
     <div class="pdp-lightbox" id="pdp-lightbox" role="dialog" aria-modal="true" aria-hidden="true">
       <div class="counter" id="pdp-zoomCounter" aria-live="polite"></div>
       <div class="controls">
-        <button class="btn" type="button" id="pdp-zoomToggle" aria-label="Zoom in">+</button>
-        <button class="btn" type="button" id="pdp-closeZoom" aria-label="Close">×</button>
+        <button class="btn" type="button" id="pdp-zoomToggle" aria-label="Zoom in">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 4V16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M4 10H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button class="btn" type="button" id="pdp-closeZoom" aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <path d="M5 5L15 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M15 5L5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
       </div>
       <div class="side-nav">
-        <button class="btn" type="button" id="pdp-prevZoom" aria-label="Previous image">❮</button>
-        <button class="btn" type="button" id="pdp-nextZoom" aria-label="Next image">❯</button>
+        <button class="btn" type="button" id="pdp-prevZoom" aria-label="Previous image">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12.5 5L7.5 10L12.5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="btn" type="button" id="pdp-nextZoom" aria-label="Next image">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7.5 5L12.5 10L7.5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
       <div class="bottom" id="pdp-zoomDots"></div>
       <div class="stage" id="pdp-zoomStage">
@@ -360,9 +378,9 @@
   }
 
   .pdp-scope .pdp-zoom {
-    --pdp-zoom-btn-size: 38px;
-    --pdp-zoom-btn-bg: #111;
-    --pdp-zoom-btn-bg-hover: #222;
+    --pdp-zoom-btn-size: 32px;
+    --pdp-zoom-btn-bg: #242424;
+    --pdp-zoom-btn-bg-hover: #333;
     --pdp-zoom-btn-fg: #fff;
     --pdp-zoom-edge-gap: 18px;
     --pdp-zoom-dot: 10px;
@@ -444,6 +462,8 @@
   .pdp-scope .pdp-lightbox .btn {
     width: var(--pdp-zoom-btn-size);
     height: var(--pdp-zoom-btn-size);
+    margin: 15px 15px 5px 5px;
+    padding: 0;
     background: var(--pdp-zoom-btn-bg);
     color: var(--pdp-zoom-btn-fg);
     border: none;
@@ -451,11 +471,15 @@
     display: inline-flex;
     justify-content: center;
     align-items: center;
-    font-size: 18px;
+    font-size: 0;
     line-height: 1;
     cursor: pointer;
     transition: background 0.2s ease, transform 0.1s ease, opacity var(--pdp-zoom-ui-fade) ease;
     box-shadow: none;
+  }
+  .pdp-scope .pdp-lightbox .btn svg {
+    width: 20px;
+    height: 20px;
   }
   .pdp-scope .pdp-lightbox .btn:hover { background: var(--pdp-zoom-btn-bg-hover); }
   .pdp-scope .pdp-lightbox .btn:active { transform: scale(0.96); }
@@ -791,6 +815,8 @@
       const nextBtn = scope.querySelector('#pdp-nextZoom');
       const dotsWrap = scope.querySelector('#pdp-zoomDots');
       const counter = scope.querySelector('#pdp-zoomCounter');
+      const iconZoomIn = zoomToggle ? zoomToggle.innerHTML.trim() : '';
+      const iconZoomReset = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M4 10H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
 
       if (!lightbox || !stage || !zoomedImage || !zoomToggle || !closeBtn || !prevBtn || !nextBtn || !dotsWrap || !counter) {
         return {
@@ -818,7 +844,9 @@
       const apply = () => {
         zoomedImage.style.transform = `translate3d(${state.tx}px, ${state.ty}px, 0) scale(${state.scale})`;
         const needsReset = (state.scale > 1.01 || Math.abs(state.tx) > 1 || Math.abs(state.ty) > 1);
-        zoomToggle.textContent = needsReset ? '−' : '+';
+        if (zoomToggle) {
+          zoomToggle.innerHTML = needsReset ? iconZoomReset : iconZoomIn;
+        }
         zoomToggle.setAttribute('aria-label', needsReset ? 'Reset zoom' : 'Zoom in');
       };
 
