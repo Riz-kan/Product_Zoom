@@ -18,7 +18,15 @@
     <!-- LEFT: Product Image + Thumbnails + Mobile Scroller -->
     <div class="product-image">
       <div class="product-thumbnails" id="pdp-productThumbnails"></div>
-      <img id="pdp-mainProductImage" src="" alt="Product"/>
+      <img
+        id="pdp-mainProductImage"
+        src=""
+        alt="Product image"
+        role="button"
+        tabindex="0"
+        aria-haspopup="dialog"
+        aria-label="Open image gallery"
+      />
       <!-- MOBILE: Horizontal image scroller -->
       <div class="mobile-image-strip" id="pdp-mobileImageStrip" aria-label="Product Images" tabindex="0"></div>
     </div>
@@ -187,6 +195,41 @@
       <!-- /Accordion -->
     </div>
   </div>
+  <div class="pdp-zoom" aria-hidden="true">
+    <div class="pdp-lightbox" id="pdp-lightbox" role="dialog" aria-modal="true" aria-hidden="true">
+      <div class="counter" id="pdp-zoomCounter" aria-live="polite"></div>
+      <div class="controls">
+        <button class="btn" type="button" id="pdp-zoomToggle" aria-label="Zoom in">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 4V16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M4 10H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button class="btn" type="button" id="pdp-closeZoom" aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <path d="M5 5L15 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M15 5L5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="side-nav">
+        <button class="btn" type="button" id="pdp-prevZoom" aria-label="Previous image">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12.5 5L7.5 10L12.5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="btn" type="button" id="pdp-nextZoom" aria-label="Next image">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7.5 5L12.5 10L7.5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="bottom" id="pdp-zoomDots"></div>
+      <div class="stage" id="pdp-zoomStage">
+        <img id="pdp-zoomedImage" class="pdp-zoom-image" alt="" />
+      </div>
+    </div>
+  </div>
 </section>
 
 <style>
@@ -205,7 +248,17 @@
   .pdp-scope .product-thumbnails { display: flex; flex-direction: column; gap: 0.4rem; width: 20%; max-width: 60px; }
   .pdp-scope .thumbnail { aspect-ratio: 3/4; width: 100%; object-fit: cover; border: none; cursor: pointer; transition: outline 0.2s; }
   .pdp-scope .thumbnail.active { outline: 1px solid #000; outline-offset: 2px; }
-  .pdp-scope #pdp-mainProductImage { aspect-ratio: 4/5; width: 90%; object-fit: cover; display: block; }
+  .pdp-scope #pdp-mainProductImage {
+    aspect-ratio: 4/5;
+    width: 90%;
+    object-fit: cover;
+    display: block;
+    cursor: zoom-in;
+  }
+  .pdp-scope #pdp-mainProductImage:focus-visible {
+    outline: 2px solid #000;
+    outline-offset: 2px;
+  }
   .pdp-scope .mobile-image-strip { display: none; }
   .pdp-scope .product-form { flex: 0 0 50%; }
 
@@ -323,224 +376,799 @@
       scroll-snap-align: start; border: none; display: block; background: #fafafa;
     }
   }
+
+  .pdp-scope .pdp-zoom {
+    --pdp-zoom-btn-size: 32px;
+    --pdp-zoom-btn-bg: #242424;
+    --pdp-zoom-btn-bg-hover: #333;
+    --pdp-zoom-btn-fg: #fff;
+    --pdp-zoom-edge-gap: 18px;
+    --pdp-zoom-dot: 10px;
+    --pdp-zoom-ui-fade: 160ms;
+  }
+  .pdp-scope .pdp-lightbox {
+    position: fixed;
+    inset: 0;
+    background: #fff;
+    display: none;
+    z-index: 999;
+  }
+  .pdp-scope .pdp-lightbox.open { display: block; }
+  .pdp-scope .pdp-lightbox .stage {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    touch-action: none;
+  }
+  .pdp-scope .pdp-zoom-image {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 90vw;
+    max-height: 90vh;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-drag: none;
+    will-change: transform;
+    transition: transform 0.12s ease;
+    transform-origin: 50% 50%;
+  }
+  .pdp-scope .pdp-lightbox.dragging .pdp-zoom-image {
+    cursor: grabbing;
+    transition: none;
+  }
+  .pdp-scope .pdp-lightbox .controls,
+  .pdp-scope .pdp-lightbox .side-nav,
+  .pdp-scope .pdp-lightbox .bottom,
+  .pdp-scope .pdp-lightbox .counter {
+    position: absolute;
+    z-index: 3;
+  }
+  .pdp-scope .pdp-lightbox .controls {
+    top: var(--pdp-zoom-edge-gap);
+    right: var(--pdp-zoom-edge-gap);
+    display: flex;
+    gap: 10px;
+  }
+  .pdp-scope .pdp-lightbox .side-nav {
+    top: 50%;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    pointer-events: none;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 var(--pdp-zoom-edge-gap);
+  }
+  .pdp-scope .pdp-lightbox .side-nav .btn { pointer-events: auto; }
+  .pdp-scope .pdp-lightbox .counter {
+    top: var(--pdp-zoom-edge-gap);
+    left: var(--pdp-zoom-edge-gap);
+    font-size: 13px;
+    color: #111;
+    opacity: 0.7;
+  }
+  .pdp-scope .pdp-lightbox .bottom {
+    bottom: 16px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+  .pdp-scope .pdp-lightbox .btn {
+    width: var(--pdp-zoom-btn-size);
+    height: var(--pdp-zoom-btn-size);
+    margin: 15px 15px 5px 5px;
+    padding: 0;
+    background: var(--pdp-zoom-btn-bg);
+    color: var(--pdp-zoom-btn-fg);
+    border: none;
+    border-radius: 0;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.1s ease, opacity var(--pdp-zoom-ui-fade) ease;
+    box-shadow: none;
+  }
+  .pdp-scope .pdp-lightbox .btn svg {
+    width: 20px;
+    height: 20px;
+  }
+  .pdp-scope .pdp-lightbox .btn:hover { background: var(--pdp-zoom-btn-bg-hover); }
+  .pdp-scope .pdp-lightbox .btn:active { transform: scale(0.96); }
+  .pdp-scope .pdp-lightbox .dot {
+    width: var(--pdp-zoom-dot);
+    height: var(--pdp-zoom-dot);
+    border-radius: 50%;
+    border: 1.5px solid #111;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+  }
+  .pdp-scope .pdp-lightbox .dot[aria-current="true"] { background: #111; }
+  .pdp-scope .pdp-lightbox.ui-hidden .controls .btn,
+  .pdp-scope .pdp-lightbox.ui-hidden .side-nav .btn { opacity: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .pdp-scope .pdp-lightbox .btn,
+    .pdp-scope .pdp-zoom-image {
+      transition: none !important;
+    }
+  }
 </style>
 
 <script type="module">
   const pdpRoot = document.querySelector('.pdp-scope');
+  if (!pdpRoot) {
+    console.warn('PDP root not found for zoom integration.');
+  } else {
+    const VARIANTS = [
+      {
+        id: "42445118799990",
+        color: "#ADD8E6",
+        title: "Blue",
+        images: [
+          "https://cdn.shopify.com/s/files/1/0623/9718/6166/files/Sbfd9b49d5eb548c9bb90a8dfa8b675c9Z.webp?v=1754469861",
+          "https://cdn.shopify.com/s/files/1/0623/9718/6166/files/image_-_2025-08-06T103216.764.jpg?v=1754456548"
+        ]
+      },
+      {
+        id: "42445118767222",
+        color: "#F5F5DC",
+        title: "Beige",
+        images: [
+          "https://cdn.shopify.com/s/files/1/0623/9718/6166/files/S35b203ac434149a1ba4677e31bd7e4e2J.webp?v=1754470146",
+          "https://cdn.shopify.com/s/files/1/0623/9718/6166/files/image_-_2025-08-06T103216.764.jpg?v=1754456548"
+        ]
+      },
+      {
+        id: "42445118734454",
+        color: "#000000",
+        title: "Black",
+        images: [
+          "https://cdn.shopify.com/s/files/1/0623/9718/6166/files/S8824b71e1a6f47638b1e18eb39e7cb9bo.webp?v=1754469647",
+          "https://cdn.shopify.com/s/files/1/0623/9718/6166/files/image_-_2025-08-06T103216.764.jpg?v=1754456548"
+        ]
+      },
+      {
+        id: "42445118832758",
+        color: "#FFC0CB",
+        title: "Pink",
+        images: [
+          "https://cdn.shopify.com/s/files/1/0623/9718/6166/files/S2c775e89f8fa41a4b5643fabe786d4e5x.webp?v=1754469766",
+          "https://cdn.shopify.com/s/files/1/0623/9718/6166/files/image_-_2025-08-06T103216.764.jpg?v=1754456548"
+        ]
+      }
+    ];
 
-  // Variant data (use real Shopify variant IDs)
-  const VARIANTS = [
-    {
-      id: "42445118799990",
-      color: "#ADD8E6",
-      title: "Blue",
-      images: [
-        "https://cdn.shopify.com/s/files/1/0623/9718/6166/files/Sbfd9b49d5eb548c9bb90a8dfa8b675c9Z.webp?v=1754469861",
-        "https://cdn.shopify.com/s/files/1/0623/9718/6166/files/image_-_2025-08-06T103216.764.jpg?v=1754456548"
-      ]
-    },
-    {
-      id: "42445118767222",
-      color: "#F5F5DC",
-      title: "Beige",
-      images: [
-        "https://cdn.shopify.com/s/files/1/0623/9718/6166/files/S35b203ac434149a1ba4677e31bd7e4e2J.webp?v=1754470146",
-        "https://cdn.shopify.com/s/files/1/0623/9718/6166/files/image_-_2025-08-06T103216.764.jpg?v=1754456548"
-      ]
-    },
-    {
-      id: "42445118734454",
-      color: "#000000",
-      title: "Black",
-      images: [
-        "https://cdn.shopify.com/s/files/1/0623/9718/6166/files/S8824b71e1a6f47638b1e18eb39e7cb9bo.webp?v=1754469647",
-        "https://cdn.shopify.com/s/files/1/0623/9718/6166/files/image_-_2025-08-06T103216.764.jpg?v=1754456548"
-      ]
-    },
-    {
-      id: "42445118832758",
-      color: "#FFC0CB",
-      title: "Pink",
-      images: [
-        "https://cdn.shopify.com/s/files/1/0623/9718/6166/files/S2c775e89f8fa41a4b5643fabe786d4e5x.webp?v=1754469766",
-        "https://cdn.shopify.com/s/files/1/0623/9718/6166/files/image_-_2025-08-06T103216.764.jpg?v=1754456548"
-      ]
+    const swatchWrapper = pdpRoot.querySelector('#pdp-swatchWrapper');
+    const thumbsDiv = pdpRoot.querySelector('#pdp-productThumbnails');
+    const mainImage = pdpRoot.querySelector('#pdp-mainProductImage');
+    const mobileImageStrip = pdpRoot.querySelector('#pdp-mobileImageStrip');
+    const addToCartComponent = pdpRoot.querySelector('#pdp-addToCartComponent');
+    const variantIdInput = pdpRoot.querySelector('#pdp-variantIdInput');
+
+    const zoom = createZoomLightbox(pdpRoot);
+    let currentVariantImages = [];
+    let currentImageIndex = 0;
+    const mainImageBaseAlt = (mainImage && mainImage.getAttribute('alt')) || 'Product image';
+
+    function normalizeVariantImages(variant) {
+      return (variant.images || []).map((src, i) => ({
+        src,
+        alt: `${variant.title} image ${i + 1}`
+      }));
     }
-  ];
 
-  // Build swatches
-  const swatchWrapper = pdpRoot.querySelector('#pdp-swatchWrapper');
-  swatchWrapper.innerHTML = '';
-  VARIANTS.forEach((variant, idx) => {
-    const sw = document.createElement('div');
-    sw.className = 'swatch' + (idx === 0 ? ' selected' : '');
-    sw.style.backgroundColor = variant.color;
-    sw.title = variant.title;
-    sw.dataset.variantId = variant.id;
-    sw.tabIndex = 0;
-    sw.addEventListener('click', () => selectVariant(idx));
-    sw.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectVariant(idx); }
-    });
-    swatchWrapper.appendChild(sw);
-  });
-
-  function renderThumbnails(images) {
-    const thumbsDiv = pdpRoot.querySelector("#pdp-productThumbnails");
-    thumbsDiv.innerHTML = "";
-    images.forEach((imgUrl, i) => {
-      const img = document.createElement("img");
-      img.className = "thumbnail" + (i === 0 ? " active" : "");
-      img.src = imgUrl;
-      img.alt = `Thumbnail ${i+1}`;
-      img.onclick = () => {
-        thumbsDiv.querySelectorAll(".thumbnail").forEach(t => t.classList.remove("active"));
-        img.classList.add("active");
-        pdpRoot.querySelector("#pdp-mainProductImage").src = imgUrl;
-        pdpRoot.querySelector("#pdp-addToCartComponent").dataset.productVariantMedia = imgUrl;
-      };
-      thumbsDiv.appendChild(img);
-    });
-    if (images[0]) {
-      pdpRoot.querySelector("#pdp-mainProductImage").src = images[0];
-      pdpRoot.querySelector("#pdp-addToCartComponent").dataset.productVariantMedia = images[0];
-    }
-  }
-
-  function renderMobileStrip(images) {
-    const strip = pdpRoot.querySelector('#pdp-mobileImageStrip');
-    strip.innerHTML = '';
-    images.forEach((url, i) => {
-      const img = document.createElement('img');
-      img.src = url;
-      img.loading = i === 0 ? 'eager' : 'lazy';
-      img.decoding = 'async';
-      img.setAttribute('role','group');
-      img.setAttribute('aria-label', `Image ${i+1} of ${images.length}`);
-      strip.appendChild(img);
-    });
-  }
-
-  function selectVariant(index) {
-    pdpRoot.querySelectorAll('.swatch').forEach((s, i) =>
-      s.classList.toggle('selected', i === index)
-    );
-    pdpRoot.querySelector('#pdp-variantIdInput').value = VARIANTS[index].id;
-    renderThumbnails(VARIANTS[index].images);
-    renderMobileStrip(VARIANTS[index].images);
-  }
-
-  // Init first variant
-  selectVariant(0);
-
-  // Quantity
-  let qty = 1;
-  const qtyInput = pdpRoot.querySelector('#pdp-quantityInput');
-  const qtyValue = pdpRoot.querySelector('#pdp-qtyValue');
-  pdpRoot.querySelector('#pdp-qtyPlus').addEventListener('click', () => {
-    qty = Math.min(10, qty + 1);
-    qtyValue.textContent = qty;
-    qtyInput.value = qty;
-  });
-  pdpRoot.querySelector('#pdp-qtyMinus').addEventListener('click', () => {
-    qty = Math.max(1, qty - 1);
-    qtyValue.textContent = qty;
-    qtyInput.value = qty;
-  });
-
-  // MOBILE: update ATC media on scroll (debounced)
-  const mobileImageStrip = pdpRoot.querySelector('#pdp-mobileImageStrip');
-  if (mobileImageStrip) {
-    let lastIndex = 0;
-    let t = 0;
-    mobileImageStrip.addEventListener('scroll', () => {
-      clearTimeout(t);
-      t = setTimeout(() => {
-        const images = Array.from(mobileImageStrip.querySelectorAll('img'));
-        const sl = mobileImageStrip.scrollLeft;
-        let minDist = Infinity; let activeIndex = 0;
-        images.forEach((img, idx) => {
-          const dist = Math.abs(img.offsetLeft - sl);
-          if (dist < minDist) { minDist = dist; activeIndex = idx; }
-        });
-        if (activeIndex !== lastIndex) {
-          pdpRoot.querySelector("#pdp-addToCartComponent").dataset.productVariantMedia = images[activeIndex].src;
-          lastIndex = activeIndex;
-        }
-      }, 100);
-    });
-  }
-
-  // Accordion
-  const accordionContainer = pdpRoot.querySelector('.product-details-accordion');
-  if (accordionContainer) {
-    const allowMultiple = true;
-    const accordions = accordionContainer.querySelectorAll('.accordion');
-
-    const openAcc = (acc) => {
-      const header = acc.querySelector('.accordion-header');
-      const panel = acc.querySelector('.accordion-body');
-      const icon = acc.querySelector('.accordion-icon');
-      if (!panel || !header) return;
-      panel.style.maxHeight = panel.scrollHeight + 'px';
-      header.setAttribute('aria-expanded', 'true');
-      acc.classList.add('open');
-      if (icon) icon.textContent = '−';
-    };
-
-    const closeAcc = (acc) => {
-      const header = acc.querySelector('.accordion-header');
-      const panel = acc.querySelector('.accordion-body');
-      const icon = acc.querySelector('.accordion-icon');
-      if (!panel || !header) return;
-      panel.style.maxHeight = panel.scrollHeight + 'px';
-      void panel.offsetHeight;
-      panel.style.maxHeight = '0px';
-      header.setAttribute('aria-expanded', 'false');
-      acc.classList.remove('open');
-      if (icon) icon.textContent = '+';
-    };
-
-    const toggleAcc = (targetAcc) => {
-      const isOpen = targetAcc.classList.contains('open');
-      if (!allowMultiple) {
-        accordions.forEach((acc) => {
-          if (acc !== targetAcc) closeAcc(acc);
+    function setActiveImage(index) {
+      if (!currentVariantImages[index]) {
+        return;
+      }
+      currentImageIndex = index;
+      const item = currentVariantImages[index];
+      if (mainImage) {
+        mainImage.src = item.src;
+        mainImage.alt = item.alt || mainImageBaseAlt;
+      }
+      if (addToCartComponent) {
+        addToCartComponent.dataset.productVariantMedia = item.src;
+      }
+      if (thumbsDiv) {
+        const thumbs = thumbsDiv.querySelectorAll('.thumbnail');
+        thumbs.forEach((thumb, idx) => {
+          thumb.classList.toggle('active', idx === index);
         });
       }
-      isOpen ? closeAcc(targetAcc) : openAcc(targetAcc);
-    };
+      zoom.setActiveIndex(index);
+    }
 
-    accordions.forEach((acc) => {
-      const header = acc.querySelector('.accordion-header');
-      const panel = acc.querySelector('.accordion-body');
-      const icon = acc.querySelector('.accordion-icon');
-      if (!header || !panel) return;
+    function renderThumbnails(images) {
+      if (!thumbsDiv) {
+        return;
+      }
+      thumbsDiv.innerHTML = '';
+      images.forEach((image, i) => {
+        const thumb = document.createElement('img');
+        thumb.className = 'thumbnail' + (i === currentImageIndex ? ' active' : '');
+        thumb.src = image.src;
+        thumb.alt = image.alt || `Thumbnail ${i + 1}`;
+        thumb.loading = i === 0 ? 'eager' : 'lazy';
+        thumb.decoding = 'async';
+        thumb.draggable = false;
+        thumb.addEventListener('click', () => {
+          setActiveImage(i);
+        });
+        thumb.addEventListener('dblclick', () => openZoomAt(i, thumb));
+        thumbsDiv.appendChild(thumb);
+      });
+    }
 
-      header.addEventListener('click', () => toggleAcc(acc));
-      header.addEventListener('keydown', (event) => {
+    function renderMobileStrip(images) {
+      if (!mobileImageStrip) {
+        return;
+      }
+      mobileImageStrip.innerHTML = '';
+      images.forEach((image, i) => {
+        const img = document.createElement('img');
+        img.src = image.src;
+        img.loading = i === 0 ? 'eager' : 'lazy';
+        img.decoding = 'async';
+        img.draggable = false;
+        img.setAttribute('role', 'group');
+        img.setAttribute('aria-label', `Image ${i + 1} of ${images.length}`);
+        img.addEventListener('click', () => {
+          setActiveImage(i);
+          openZoomAt(i, img);
+        });
+        mobileImageStrip.appendChild(img);
+      });
+    }
+
+    function selectVariant(index) {
+      const variant = VARIANTS[index];
+      if (!variant) {
+        return;
+      }
+      if (swatchWrapper) {
+        swatchWrapper.querySelectorAll('.swatch').forEach((swatch, i) => {
+          swatch.classList.toggle('selected', i === index);
+        });
+      }
+      if (variantIdInput) {
+        variantIdInput.value = variant.id;
+      }
+      currentVariantImages = normalizeVariantImages(variant);
+      currentImageIndex = 0;
+      renderThumbnails(currentVariantImages);
+      renderMobileStrip(currentVariantImages);
+      zoom.setImages(currentVariantImages);
+      setActiveImage(0);
+    }
+
+    function openZoomAt(index, opener) {
+      if (!currentVariantImages.length) {
+        return;
+      }
+      const targetIndex = typeof index === 'number' ? index : currentImageIndex;
+      zoom.openAt(targetIndex, opener);
+    }
+
+    if (swatchWrapper) {
+      swatchWrapper.innerHTML = '';
+      VARIANTS.forEach((variant, idx) => {
+        const sw = document.createElement('div');
+        sw.className = 'swatch' + (idx === 0 ? ' selected' : '');
+        sw.style.backgroundColor = variant.color;
+        sw.title = variant.title;
+        sw.dataset.variantId = variant.id;
+        sw.tabIndex = 0;
+        sw.addEventListener('click', () => selectVariant(idx));
+        sw.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            selectVariant(idx);
+          }
+        });
+        swatchWrapper.appendChild(sw);
+      });
+    }
+
+    selectVariant(0);
+
+    if (mainImage) {
+      mainImage.addEventListener('click', () => openZoomAt(currentImageIndex, mainImage));
+      mainImage.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          toggleAcc(acc);
+          openZoomAt(currentImageIndex, mainImage);
+        }
+      });
+    }
+
+    let qty = 1;
+    const qtyInput = pdpRoot.querySelector('#pdp-quantityInput');
+    const qtyValue = pdpRoot.querySelector('#pdp-qtyValue');
+    const qtyPlus = pdpRoot.querySelector('#pdp-qtyPlus');
+    const qtyMinus = pdpRoot.querySelector('#pdp-qtyMinus');
+    qtyPlus?.addEventListener('click', () => {
+      qty = Math.min(10, qty + 1);
+      if (qtyValue) qtyValue.textContent = String(qty);
+      if (qtyInput) qtyInput.value = String(qty);
+    });
+    qtyMinus?.addEventListener('click', () => {
+      qty = Math.max(1, qty - 1);
+      if (qtyValue) qtyValue.textContent = String(qty);
+      if (qtyInput) qtyInput.value = String(qty);
+    });
+
+    if (mobileImageStrip) {
+      let lastIndex = 0;
+      let scrollTimeout = 0;
+      mobileImageStrip.addEventListener('scroll', () => {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = window.setTimeout(() => {
+          const images = Array.from(mobileImageStrip.querySelectorAll('img'));
+          if (!images.length) {
+            return;
+          }
+          const { scrollLeft } = mobileImageStrip;
+          let minDist = Infinity;
+          let activeIndex = 0;
+          images.forEach((img, idx) => {
+            const dist = Math.abs(img.offsetLeft - scrollLeft);
+            if (dist < minDist) {
+              minDist = dist;
+              activeIndex = idx;
+            }
+          });
+          if (activeIndex !== lastIndex) {
+            lastIndex = activeIndex;
+            setActiveImage(activeIndex);
+          }
+        }, 100);
+      });
+    }
+
+    const accordionContainer = pdpRoot.querySelector('.product-details-accordion');
+    if (accordionContainer) {
+      const allowMultiple = true;
+      const accordions = accordionContainer.querySelectorAll('.accordion');
+
+      const openAcc = (acc) => {
+        const header = acc.querySelector('.accordion-header');
+        const panel = acc.querySelector('.accordion-body');
+        const icon = acc.querySelector('.accordion-icon');
+        if (!panel || !header) return;
+        panel.style.maxHeight = panel.scrollHeight + 'px';
+        header.setAttribute('aria-expanded', 'true');
+        acc.classList.add('open');
+        if (icon) icon.textContent = '−';
+      };
+
+      const closeAcc = (acc) => {
+        const header = acc.querySelector('.accordion-header');
+        const panel = acc.querySelector('.accordion-body');
+        const icon = acc.querySelector('.accordion-icon');
+        if (!panel || !header) return;
+        panel.style.maxHeight = panel.scrollHeight + 'px';
+        void panel.offsetHeight;
+        panel.style.maxHeight = '0px';
+        header.setAttribute('aria-expanded', 'false');
+        acc.classList.remove('open');
+        if (icon) icon.textContent = '+';
+      };
+
+      const toggleAcc = (targetAcc) => {
+        const isOpen = targetAcc.classList.contains('open');
+        if (!allowMultiple) {
+          accordions.forEach((acc) => {
+            if (acc !== targetAcc) closeAcc(acc);
+          });
+        }
+        isOpen ? closeAcc(targetAcc) : openAcc(targetAcc);
+      };
+
+      accordions.forEach((acc) => {
+        const header = acc.querySelector('.accordion-header');
+        const panel = acc.querySelector('.accordion-body');
+        const icon = acc.querySelector('.accordion-icon');
+        if (!header || !panel) return;
+
+        header.addEventListener('click', () => toggleAcc(acc));
+        header.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            toggleAcc(acc);
+          }
+        });
+
+        header.setAttribute('aria-expanded', 'false');
+        panel.style.maxHeight = '0px';
+        acc.classList.remove('open');
+        if (icon) icon.textContent = '+';
+      });
+
+      window.addEventListener('resize', () => {
+        accordionContainer.querySelectorAll('.accordion.open .accordion-body').forEach((panel) => {
+          panel.style.maxHeight = panel.scrollHeight + 'px';
+        });
+      });
+
+      const firstAccordion = accordions[0];
+      if (firstAccordion) openAcc(firstAccordion);
+    }
+
+    function createZoomLightbox(scope) {
+
+      const lightbox = scope.querySelector('#pdp-lightbox');
+      const stage = scope.querySelector('#pdp-zoomStage');
+      const zoomedImage = scope.querySelector('#pdp-zoomedImage');
+      const zoomToggle = scope.querySelector('#pdp-zoomToggle');
+      const closeBtn = scope.querySelector('#pdp-closeZoom');
+      const prevBtn = scope.querySelector('#pdp-prevZoom');
+      const nextBtn = scope.querySelector('#pdp-nextZoom');
+      const dotsWrap = scope.querySelector('#pdp-zoomDots');
+      const counter = scope.querySelector('#pdp-zoomCounter');
+      const iconZoomIn = zoomToggle ? zoomToggle.innerHTML.trim() : '';
+      const iconZoomReset = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M4 10H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+
+      if (!lightbox || !stage || !zoomedImage || !zoomToggle || !closeBtn || !prevBtn || !nextBtn || !dotsWrap || !counter) {
+        return {
+          setImages() {},
+          openAt() {},
+          setActiveIndex() {}
+        };
+      }
+
+      const body = document.body;
+      const state = { scale: 1, min: 1, max: 4, tx: 0, ty: 0, baseW: 0, baseH: 0, viewW: 0, viewH: 0 };
+      const viewer = { index: 0, isOpen: false };
+      const pts = new Map();
+      const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
+      let images = [];
+      let pinchStart = null;
+      let raf = null;
+      let idleTimer = null;
+      let startDrag = null;
+      let focusables = [];
+      let firstEl = null;
+      let lastEl = null;
+      let prevActive = null;
+
+      const apply = () => {
+        zoomedImage.style.transform = `translate3d(${state.tx}px, ${state.ty}px, 0) scale(${state.scale})`;
+        const needsReset = (state.scale > 1.01 || Math.abs(state.tx) > 1 || Math.abs(state.ty) > 1);
+        if (zoomToggle) {
+          zoomToggle.innerHTML = needsReset ? iconZoomReset : iconZoomIn;
+        }
+        zoomToggle.setAttribute('aria-label', needsReset ? 'Reset zoom' : 'Zoom in');
+      };
+
+      const clampPan = () => {
+        const contentW = state.baseW * state.scale;
+        const contentH = state.baseH * state.scale;
+        const maxX = Math.max(0, (contentW - state.viewW) / 2);
+        const maxY = Math.max(0, (contentH - state.viewH) / 2);
+        state.tx = clamp(state.tx, -maxX, maxX);
+        state.ty = clamp(state.ty, -maxY, maxY);
+      };
+
+      const schedule = () => {
+        if (!raf) {
+          raf = requestAnimationFrame(() => {
+            raf = null;
+            clampPan();
+            apply();
+          });
+        }
+      };
+
+      function measureBase() {
+        const prev = zoomedImage.style.transform;
+        zoomedImage.style.transform = 'translate3d(0,0,0) scale(1)';
+        const rect = zoomedImage.getBoundingClientRect();
+        const stageRect = stage.getBoundingClientRect();
+        state.baseW = rect.width;
+        state.baseH = rect.height;
+        state.viewW = stageRect.width;
+        state.viewH = stageRect.height;
+        zoomedImage.style.transform = prev;
+        if (zoomedImage.naturalWidth && state.baseW) {
+          const limitW = zoomedImage.naturalWidth / state.baseW;
+          const limitH = zoomedImage.naturalHeight / state.baseH;
+          state.max = Math.max(1, Math.min(4, limitW, limitH));
+        }
+      }
+
+      const showUI = () => {
+        lightbox.classList.remove('ui-hidden');
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => lightbox.classList.add('ui-hidden'), 1600);
+      };
+
+      function buildDots() {
+        dotsWrap.innerHTML = '';
+        images.forEach((_, i) => {
+          const dot = document.createElement('button');
+          dot.type = 'button';
+          dot.className = 'dot';
+          dot.setAttribute('aria-label', `Go to image ${i + 1}`);
+          dot.addEventListener('click', () => setSlide(i));
+          dotsWrap.appendChild(dot);
+        });
+      }
+
+      function updateDots() {
+        const children = dotsWrap.children;
+        for (let i = 0; i < children.length; i += 1) {
+          children[i].setAttribute('aria-current', i === viewer.index ? 'true' : 'false');
+        }
+      }
+
+      function resetView() {
+        state.scale = 1;
+        state.tx = 0;
+        state.ty = 0;
+        schedule();
+      }
+
+      function zoomAt(cx, cy, nextScale) {
+        const target = clamp(nextScale, state.min, state.max);
+        const prevScale = state.scale;
+        if (target === prevScale) return;
+        state.tx = cx - (cx - state.tx) * (target / prevScale);
+        state.ty = cy - (cy - state.ty) * (target / prevScale);
+        state.scale = target;
+        schedule();
+      }
+
+      function setSlide(index) {
+        if (!images.length) {
+          return;
+        }
+        viewer.index = (index + images.length) % images.length;
+        const item = images[viewer.index];
+        zoomedImage.alt = item.alt || '';
+        zoomedImage.removeAttribute('srcset');
+        zoomedImage.removeAttribute('sizes');
+        if (zoomedImage.src !== item.src) {
+          zoomedImage.src = item.src;
+        }
+        counter.textContent = `${viewer.index + 1} / ${images.length}`;
+        updateDots();
+        [viewer.index - 1, viewer.index + 1].forEach((ii) => {
+          const neighbor = images[(ii + images.length) % images.length];
+          if (neighbor) {
+            const preload = new Image();
+            preload.src = neighbor.src;
+          }
+        });
+        if (zoomedImage.complete && zoomedImage.naturalWidth > 0) {
+          measureBase();
+          resetView();
+        } else {
+          zoomedImage.onload = () => {
+            measureBase();
+            resetView();
+            zoomedImage.onload = null;
+          };
+        }
+        showUI();
+      }
+
+      function openLightbox(index, opener) {
+        if (!images.length) {
+          return;
+        }
+        viewer.isOpen = true;
+        lightbox.classList.add('open');
+        lightbox.setAttribute('aria-hidden', 'false');
+        body.dataset.prevOverflow = body.style.overflow || '';
+        body.style.overflow = 'hidden';
+        prevActive = opener || document.activeElement;
+        setSlide(index);
+        trapFocus();
+        zoomToggle.focus();
+      }
+
+      function closeLightbox() {
+        viewer.isOpen = false;
+        lightbox.classList.remove('open', 'ui-hidden', 'dragging');
+        lightbox.setAttribute('aria-hidden', 'true');
+        body.style.overflow = body.dataset.prevOverflow || '';
+        pts.clear();
+        pinchStart = null;
+        startDrag = null;
+        clearTimeout(idleTimer);
+        releaseFocus();
+      }
+
+      closeBtn.addEventListener('click', closeLightbox);
+      zoomToggle.addEventListener('click', () => {
+        if (state.scale > 1.01 || Math.abs(state.tx) > 1 || Math.abs(state.ty) > 1) {
+          resetView();
+        } else {
+          zoomAt(0, 0, Math.min(2, state.max));
+        }
+      });
+      prevBtn.addEventListener('click', () => setSlide(viewer.index - 1));
+      nextBtn.addEventListener('click', () => setSlide(viewer.index + 1));
+
+      lightbox.addEventListener('mousemove', showUI);
+      lightbox.addEventListener('click', (event) => {
+        if (event.target === lightbox) closeLightbox();
+      });
+
+      window.addEventListener('keydown', (event) => {
+        if (!viewer.isOpen) return;
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeLightbox();
+        } else if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          setSlide(viewer.index + 1);
+        } else if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          setSlide(viewer.index - 1);
+        } else if (event.key === '+' || (event.key === '=' && (event.ctrlKey || event.metaKey))) {
+          event.preventDefault();
+          zoomAt(0, 0, state.scale * 1.25);
+        } else if (event.key === '-' || (event.key === '_' && (event.ctrlKey || event.metaKey))) {
+          event.preventDefault();
+          zoomAt(0, 0, state.scale / 1.25);
         }
       });
 
-      // Initialize closed
-      header.setAttribute('aria-expanded', 'false');
-      panel.style.maxHeight = '0px';
-      acc.classList.remove('open');
-      if (icon) icon.textContent = '+';
-    });
-
-    // Keep height correct on resize for open items
-    window.addEventListener('resize', () => {
-      accordionContainer.querySelectorAll('.accordion.open .accordion-body').forEach((panel) => {
-        panel.style.maxHeight = panel.scrollHeight + 'px';
+      stage.addEventListener('dblclick', (event) => {
+        const rect = stage.getBoundingClientRect();
+        const cx = event.clientX - (rect.left + rect.width / 2);
+        const cy = event.clientY - (rect.top + rect.height / 2);
+        const targetScale = state.scale > 1 ? 1 : Math.min(2, state.max);
+        zoomAt(cx, cy, targetScale);
       });
-    });
 
-    // Auto-open first
-    const firstAccordion = accordions[0];
-    if (firstAccordion) openAcc(firstAccordion);
+      stage.addEventListener('pointerdown', (event) => {
+        if (!viewer.isOpen) return;
+        stage.setPointerCapture(event.pointerId);
+        pts.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (pts.size === 1) {
+          startDrag = { x: event.clientX, y: event.clientY, atScale: state.scale };
+        }
+        if (pts.size === 2) {
+          const [a, b] = [...pts.values()];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.hypot(dx, dy);
+          const rect = stage.getBoundingClientRect();
+          const cx = (a.x + b.x) / 2 - (rect.left + rect.width / 2);
+          const cy = (a.y + b.y) / 2 - (rect.top + rect.height / 2);
+          pinchStart = { dist, scale: state.scale, cx, cy };
+        }
+        lightbox.classList.add('dragging');
+        showUI();
+      });
+
+      stage.addEventListener('pointermove', (event) => {
+        if (!pts.has(event.pointerId)) return;
+        const previous = pts.get(event.pointerId);
+        const current = { x: event.clientX, y: event.clientY };
+        pts.set(event.pointerId, current);
+
+        if (pts.size === 1) {
+          if (state.scale === 1 && startDrag) {
+            const dx = current.x - startDrag.x;
+            const dy = current.y - startDrag.y;
+            if (Math.abs(dx) > 48 && Math.abs(dy) < 40) {
+              setSlide(viewer.index + (dx < 0 ? 1 : -1));
+              startDrag = { x: current.x, y: current.y, atScale: 1 };
+              return;
+            }
+          }
+          state.tx += current.x - previous.x;
+          state.ty += current.y - previous.y;
+          schedule();
+        } else if (pts.size === 2 && pinchStart) {
+          const [a, b] = [...pts.values()];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.hypot(dx, dy);
+          const nextScale = clamp(pinchStart.scale * (dist / pinchStart.dist), state.min, state.max);
+          zoomAt(pinchStart.cx, pinchStart.cy, nextScale);
+        }
+      }, { passive: false });
+
+      const endPointer = (event) => {
+        if (!pts.has(event.pointerId)) return;
+        pts.delete(event.pointerId);
+        if (pts.size < 2) pinchStart = null;
+        if (!pts.size) {
+          lightbox.classList.remove('dragging');
+          startDrag = null;
+        }
+      };
+      stage.addEventListener('pointerup', endPointer);
+      stage.addEventListener('pointercancel', endPointer);
+      stage.addEventListener('pointerleave', endPointer);
+
+      stage.addEventListener('wheel', (event) => {
+        if (!viewer.isOpen) return;
+        event.preventDefault();
+        const factor = Math.exp(-event.deltaY * 0.0015);
+        const rect = stage.getBoundingClientRect();
+        const cx = event.clientX - (rect.left + rect.width / 2);
+        const cy = event.clientY - (rect.top + rect.height / 2);
+        zoomAt(cx, cy, state.scale * factor);
+        showUI();
+      }, { passive: false });
+
+      new ResizeObserver(() => {
+        if (viewer.isOpen) {
+          measureBase();
+          schedule();
+        }
+      }).observe(stage);
+
+      function trapFocus() {
+        focusables = [...lightbox.querySelectorAll('button,[href],[tabindex]:not([tabindex="-1"])')];
+        firstEl = focusables[0] || null;
+        lastEl = focusables[focusables.length - 1] || null;
+        lightbox.addEventListener('keydown', focusTrapHandler);
+      }
+
+      function focusTrapHandler(event) {
+        if (event.key !== 'Tab' || focusables.length === 0) return;
+        if (event.shiftKey && document.activeElement === firstEl) {
+          event.preventDefault();
+          lastEl?.focus();
+        } else if (!event.shiftKey && document.activeElement === lastEl) {
+          event.preventDefault();
+          firstEl?.focus();
+        }
+      }
+
+      function releaseFocus() {
+        lightbox.removeEventListener('keydown', focusTrapHandler);
+        prevActive?.focus?.();
+      }
+
+      return {
+        setImages(list) {
+          images = (list || []).filter((item) => item && item.src);
+          viewer.index = 0;
+          buildDots();
+          if (!images.length) {
+            zoomedImage.removeAttribute('src');
+            counter.textContent = '';
+            return;
+          }
+          updateDots();
+          counter.textContent = `${viewer.index + 1} / ${images.length}`;
+          if (viewer.isOpen) {
+            setSlide(viewer.index);
+          }
+        },
+        openAt(index, opener) {
+          const targetIndex = typeof index === 'number' ? index : viewer.index;
+          openLightbox(targetIndex, opener);
+        },
+        setActiveIndex(index) {
+          if (!images.length) {
+            viewer.index = 0;
+            counter.textContent = '';
+            return;
+          }
+          viewer.index = (index + images.length) % images.length;
+          updateDots();
+          counter.textContent = `${viewer.index + 1} / ${images.length}`;
+        }
+      };
+    }
   }
 </script>
+
