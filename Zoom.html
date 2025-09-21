@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Minimal Zoom Gallery — Fixed</title>
+<style>
+  :root{
+    --btn-size:38px; --btn-bg:#111; --btn-bg-hover:#222; --btn-fg:#fff;
+    --edge-gap:18px; --dot:10px; --ui-fade:160ms;
+  }
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#fff}
+  .gallery{display:flex;justify-content:center;align-items:center;min-height:100vh;gap:16px;flex-wrap:wrap;padding:24px}
+  .gallery img{width:220px;height:auto;cursor:zoom-in;border:1px solid #eee}
+
+  .lightbox{position:fixed;inset:0;background:#fff;display:none}
+  .lightbox.open{display:block}
+  .stage{position:absolute;inset:0;display:flex;justify-content:center;align-items:center;overflow:hidden;touch-action:none}
+  #zoomedImage{
+    display:block; /* kill inline baseline gap */
+    width:auto;height:auto;          /* keep natural aspect */
+    max-width:90vw;max-height:90vh;  /* fit viewport without distortion */
+    cursor:grab;user-select:none;-webkit-user-drag:none;
+    will-change:transform;transition:transform .12s ease;
+    transform-origin:50% 50%;
+  }
+  .dragging #zoomedImage{cursor:grabbing;transition:none}
+
+  .controls,.side-nav,.bottom,.counter{position:absolute;z-index:3}
+  .btn{
+    width:var(--btn-size);height:var(--btn-size);background:var(--btn-bg);color:var(--btn-fg);
+    border:none;border-radius:4px;display:inline-flex;justify-content:center;align-items:center;
+    font-size:18px;line-height:1;cursor:pointer;transition:background .2s ease,transform .1s ease,opacity var(--ui-fade) ease;
+    box-shadow:0 1px 3px rgba(0,0,0,.25)
+  }
+  .btn:hover{background:var(--btn-bg-hover)} .btn:active{transform:scale(.96)}
+  .controls{top:var(--edge-gap);right:var(--edge-gap);display:flex;gap:10px}
+  .side-nav{top:50%;left:0;right:0;transform:translateY(-50%);pointer-events:none;display:flex;justify-content:space-between;padding:0 var(--edge-gap)}
+  .side-nav .btn{pointer-events:auto}
+  .counter{top:var(--edge-gap);left:var(--edge-gap);font-size:13px;color:#111;opacity:.7}
+  .bottom{bottom:16px;left:0;right:0;display:flex;justify-content:center;gap:10px}
+  .dot{width:var(--dot);height:var(--dot);border-radius:50%;border:1.5px solid #111;background:transparent;padding:0;cursor:pointer}
+  .dot[aria-current="true"]{background:#111}
+  .ui-hidden .controls .btn,.ui-hidden .side-nav .btn{opacity:0}
+  @media (prefers-reduced-motion:reduce){.btn,#zoomedImage{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="gallery" id="thumbStrip"></div>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="counter" id="counter" aria-live="polite"></div>
+  <div class="controls">
+    <button class="btn" id="zoomToggle" aria-label="Zoom in">+</button>
+    <button class="btn" id="closeBtn" aria-label="Close">×</button>
+  </div>
+  <div class="side-nav" id="sideNav">
+    <button class="btn" id="prevBtn" aria-label="Previous image">❮</button>
+    <button class="btn" id="nextBtn" aria-label="Next image">❯</button>
+  </div>
+  <div class="bottom" id="dots"></div>
+  <div class="stage" id="stage">
+    <img id="zoomedImage" alt="">
+  </div>
+</div>
+
+<script>
+/* --------- IMAGES --------- */
+const images = [
+  { src:"https://cdn.shopify.com/s/files/1/0623/9718/6166/files/Sbfd9b49d5eb548c9bb90a8dfa8b675c9Z.webp?v=1754469861", alt:"Bottle front" },
+  { src:"https://cdn.shopify.com/s/files/1/0623/9718/6166/files/image_-_2025-08-22T115714.611.jpg?v=1755844049", alt:"Lifestyle 1" },
+  { src:"https://cdn.shopify.com/s/files/1/0623/9718/6166/files/image_-_2025-08-22T115508.290.jpg?v=1755843924", alt:"Lifestyle 2" }
+];
+
+/* --------- DOM --------- */
+const body=document.body, lightbox=document.getElementById('lightbox'), stage=document.getElementById('stage');
+const zoomedImage=document.getElementById('zoomedImage'), zoomToggle=document.getElementById('zoomToggle');
+const closeBtn=document.getElementById('closeBtn'), prevBtn=document.getElementById('prevBtn'), nextBtn=document.getElementById('nextBtn');
+const dotsWrap=document.getElementById('dots'), counter=document.getElementById('counter'), thumbStrip=document.getElementById('thumbStrip');
+
+/* --------- STATE --------- */
+const state={scale:1,min:1,max:4,tx:0,ty:0,baseW:0,baseH:0,viewW:0,viewH:0};
+const viewer={index:0,isOpen:false,openerEl:null};
+const clamp=(v,a,b)=>Math.min(Math.max(v,a),b);
+const pts=new Map(); let pinchStart=null, raf=null, idleTimer=null, startDrag=null;
+
+/* --------- CORE MATH --------- */
+const apply=()=>{
+  zoomedImage.style.transform=`translate3d(${state.tx}px,${state.ty}px,0) scale(${state.scale})`;
+  const needsReset=(state.scale>1.01||Math.abs(state.tx)>1||Math.abs(state.ty)>1);
+  zoomToggle.textContent=needsReset?'−':'+'; zoomToggle.setAttribute('aria-label',needsReset?'Reset zoom':'Zoom in');
+};
+const schedule=()=>{ if(!raf) raf=requestAnimationFrame(()=>{ raf=null; clampPan(); apply(); }); };
+
+function measureBase(){
+  const prev=zoomedImage.style.transform;
+  zoomedImage.style.transform='translate3d(0,0,0) scale(1)';
+  const r=zoomedImage.getBoundingClientRect(), s=stage.getBoundingClientRect();
+  state.baseW=r.width; state.baseH=r.height; state.viewW=s.width; state.viewH=s.height;
+  zoomedImage.style.transform=prev;
+  if(zoomedImage.naturalWidth&&state.baseW){
+    const limitW=zoomedImage.naturalWidth/state.baseW, limitH=zoomedImage.naturalHeight/state.baseH;
+    state.max=Math.max(1,Math.min(4,limitW,limitH));
+  }
+}
+function clampPan(){
+  const contentW=state.baseW*state.scale, contentH=state.baseH*state.scale;
+  const maxX=Math.max(0,(contentW-state.viewW)/2), maxY=Math.max(0,(contentH-state.viewH)/2);
+  state.tx=clamp(state.tx,-maxX,maxX); state.ty=clamp(state.ty,-maxY,maxY);
+}
+function zoomAt(cx,cy,nextScale){
+  nextScale=clamp(nextScale,state.min,state.max);
+  const prev=state.scale; if(nextScale===prev) return;
+  state.tx=cx-(cx-state.tx)*(nextScale/prev); state.ty=cy-(cy-state.ty)*(nextScale/prev);
+  state.scale=nextScale; schedule();
+}
+function resetView(){ state.scale=1; state.tx=0; state.ty=0; schedule(); }
+
+/* --------- UI HELPERS --------- */
+function showUI(){ lightbox.classList.remove('ui-hidden'); clearTimeout(idleTimer); idleTimer=setTimeout(()=>lightbox.classList.add('ui-hidden'),1600); }
+function makeThumb(url){ const sep=url.includes('?')?'&':'?'; return `${url}${sep}width=300`; }
+
+/* --------- THUMBS --------- */
+images.forEach((img,i)=>{
+  const el=document.createElement('img');
+  el.src=makeThumb(img.src); el.alt=img.alt||`Image ${i+1}`; el.loading='lazy'; el.decoding='async';
+  el.addEventListener('click',()=>openAt(i,el)); thumbStrip.appendChild(el);
+});
+
+/* --------- DOTS --------- */
+function buildDots(){
+  dotsWrap.innerHTML='';
+  images.forEach((_,i)=>{ const b=document.createElement('button'); b.className='dot'; b.type='button';
+    b.setAttribute('aria-label',`Go to image ${i+1}`); b.addEventListener('click',()=>setSlide(i)); dotsWrap.appendChild(b); });
+}
+buildDots();
+
+/* --------- SLIDE MGMT (FIXED LOAD/MEASURE) --------- */
+function setSlide(i){
+  viewer.index=(i+images.length)%images.length;
+  const item=images[viewer.index];
+  zoomedImage.alt=item.alt||'';
+  // Drop sizes/srcset to avoid browser picking a too-small candidate (prevents ratio/blur issues)
+  zoomedImage.removeAttribute('srcset'); zoomedImage.removeAttribute('sizes');
+  zoomedImage.src=item.src; // single authoritative source preserves aspect
+  counter.textContent=`${viewer.index+1} / ${images.length}`;
+  [...dotsWrap.children].forEach((b,idx)=>b.setAttribute('aria-current',idx===viewer.index?'true':'false'));
+  // preload neighbors (non-blocking)
+  [viewer.index-1, viewer.index+1].forEach(ii=>{ const j=(ii+images.length)%images.length; const im=new Image(); im.src=images[j].src; });
+  // Wait for real pixels before measuring (this fixes "zoom not working")
+  if(zoomedImage.complete && zoomedImage.naturalWidth>0){
+    measureBase(); resetView();
+  }else{
+    zoomedImage.onload=()=>{ measureBase(); resetView(); zoomedImage.onload=null; };
+  }
+  showUI();
+}
+
+function openAt(i,opener){
+  viewer.openerEl=opener||null; viewer.isOpen=true;
+  lightbox.classList.add('open'); lightbox.setAttribute('aria-hidden','false');
+  body.dataset.prevOverflow=body.style.overflow||''; body.style.overflow='hidden';
+  setSlide(i); trapFocus(); zoomToggle.focus();
+}
+function close(){
+  viewer.isOpen=false;
+  lightbox.classList.remove('open','ui-hidden','dragging'); lightbox.setAttribute('aria-hidden','true');
+  body.style.overflow=body.dataset.prevOverflow||''; pts.clear(); pinchStart=null; startDrag=null; releaseFocus(); viewer.openerEl?.focus?.();
+}
+
+/* --------- EVENTS --------- */
+closeBtn.addEventListener('click',close);
+zoomToggle.addEventListener('click',()=>{ (state.scale>1.01||Math.abs(state.tx)>1||Math.abs(state.ty)>1)?resetView():zoomAt(0,0,Math.min(2,state.max)); });
+prevBtn.addEventListener('click',()=>setSlide(viewer.index-1));
+nextBtn.addEventListener('click',()=>setSlide(viewer.index+1));
+lightbox.addEventListener('mousemove',showUI);
+lightbox.addEventListener('click',e=>{ if(e.target===lightbox) close(); });
+
+window.addEventListener('keydown',e=>{
+  if(!viewer.isOpen) return;
+  if(e.key==='Escape'){ e.preventDefault(); close(); }
+  else if(e.key==='ArrowRight'){ e.preventDefault(); setSlide(viewer.index+1); }
+  else if(e.key==='ArrowLeft'){ e.preventDefault(); setSlide(viewer.index-1); }
+  else if(e.key==='+' || (e.key==='='&&(e.ctrlKey||e.metaKey))){ e.preventDefault(); zoomAt(0,0,state.scale*1.25); }
+  else if(e.key==='-' || (e.key==='_'&&(e.ctrlKey||e.metaKey))){ e.preventDefault(); zoomAt(0,0,state.scale/1.25); }
+});
+
+stage.addEventListener('dblclick',e=>{
+  const rect=stage.getBoundingClientRect();
+  const cx=e.clientX-(rect.left+rect.width/2), cy=e.clientY-(rect.top+rect.height/2);
+  const target=state.scale>1?1:Math.min(2,state.max); zoomAt(cx,cy,target);
+});
+
+stage.addEventListener('pointerdown',e=>{
+  if(!viewer.isOpen) return;
+  stage.setPointerCapture(e.pointerId);
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pts.size===1){ startDrag={x:e.clientX,y:e.clientY,atScale:state.scale}; }
+  if(pts.size===2){
+    const [a,b]=[...pts.values()], dx=b.x-a.x, dy=b.y-a.y, dist=Math.hypot(dx,dy);
+    const rect=stage.getBoundingClientRect();
+    const cx=((a.x+b.x)/2-(rect.left+rect.width/2)), cy=((a.y+b.y)/2-(rect.top+rect.height/2));
+    pinchStart={dist,scale:state.scale,cx,cy};
+  }
+  lightbox.classList.add('dragging'); showUI();
+});
+stage.addEventListener('pointermove',e=>{
+  if(!pts.has(e.pointerId)) return;
+  const prev=pts.get(e.pointerId), now={x:e.clientX,y:e.clientY}; pts.set(e.pointerId,now);
+
+  if(pts.size===1){
+    if(state.scale===1 && startDrag){
+      const dx=now.x-startDrag.x, dy=now.y-startDrag.y;
+      if(Math.abs(dx)>48 && Math.abs(dy)<40){ setSlide(viewer.index+(dx<0?1:-1)); startDrag={x:now.x,y:now.y,atScale:1}; return; }
+    }
+    state.tx+=now.x-prev.x; state.ty+=now.y-prev.y; schedule();
+  }else if(pts.size===2 && pinchStart){
+    const [a,b]=[...pts.values()], dx=b.x-a.x, dy=b.y-a.y, dist=Math.hypot(dx,dy);
+    const next=clamp(pinchStart.scale*(dist/pinchStart.dist),state.min,state.max); zoomAt(pinchStart.cx,pinchStart.cy,next);
+  }
+},{passive:false});
+const end=e=>{
+  if(!pts.has(e.pointerId)) return;
+  pts.delete(e.pointerId); if(pts.size<2) pinchStart=null; if(pts.size===0){ lightbox.classList.remove('dragging'); startDrag=null; }
+};
+stage.addEventListener('pointerup',end); stage.addEventListener('pointercancel',end); stage.addEventListener('pointerleave',end);
+
+stage.addEventListener('wheel',e=>{
+  if(!viewer.isOpen) return;
+  e.preventDefault();
+  const factor=Math.exp(-e.deltaY*0.0015);
+  const rect=stage.getBoundingClientRect();
+  const cx=e.clientX-(rect.left+rect.width/2), cy=e.clientY-(rect.top+rect.height/2);
+  zoomAt(cx,cy,state.scale*factor); showUI();
+},{passive:false});
+
+new ResizeObserver(()=>{ if(viewer.isOpen){ measureBase(); schedule(); } }).observe(stage);
+
+/* --------- FOCUS TRAP --------- */
+let focusables=[],firstEl=null,lastEl=null,prevActive=null;
+function trapFocus(){ prevActive=document.activeElement;
+  focusables=[...lightbox.querySelectorAll('button,[href],[tabindex]:not([tabindex="-1"])')];
+  firstEl=focusables[0]; lastEl=focusables[focusables.length-1]; lightbox.addEventListener('keydown',trapper);
+}
+function trapper(e){
+  if(e.key!=='Tab') return;
+  if(e.shiftKey && document.activeElement===firstEl){ e.preventDefault(); lastEl.focus(); }
+  else if(!e.shiftKey && document.activeElement===lastEl){ e.preventDefault(); firstEl.focus(); }
+}
+function releaseFocus(){ lightbox.removeEventListener('keydown',trapper); prevActive?.focus?.(); }
+</script>
+</body>
+</html>
