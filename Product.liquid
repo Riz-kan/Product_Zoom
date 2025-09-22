@@ -862,6 +862,7 @@
       const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
       const SWIPE_HORIZONTAL_THRESHOLD = 48;
       const SWIPE_VERTICAL_LIMIT = 40;
+      const HYSTERESIS = 8; // px
       const quickZoomScale = () => Math.min(3, state.max);
       let images = [];
       let pinchStart = null;
@@ -877,12 +878,13 @@
 
       const apply = () => {
         const slideX = state.slideOffset || 0;
-        zoomedImage.style.transform = `translate3d(${state.tx + slideX}px, ${state.ty}px, 0) scale(${state.scale})`;
+        zoomedImage.style.transform =
+          `translate3d(${state.tx + slideX}px, ${state.ty}px, 0) scale(${state.scale})`;
         const needsReset = (state.scale > 1.01 || Math.abs(state.tx) > 1 || Math.abs(state.ty) > 1);
         if (zoomToggle) {
           zoomToggle.innerHTML = needsReset ? iconZoomReset : iconZoomIn;
+          zoomToggle.setAttribute('aria-label', needsReset ? 'Reset zoom' : 'Zoom in');
         }
-        zoomToggle.setAttribute('aria-label', needsReset ? 'Reset zoom' : 'Zoom in');
       };
 
       const clampPan = () => {
@@ -1012,7 +1014,6 @@
         const createSlidePrep = (dir) => {
           const slideClass = dir === 'next' ? 'slide-next' : 'slide-prev';
           stage.classList.remove('slide-next', 'slide-prev');
-          stage.classList.add('is-sliding', slideClass);
           stage.querySelectorAll('.slide-clone').forEach((node) => node.remove());
           const clone = zoomedImage.cloneNode(true);
           clone.removeAttribute('id');
@@ -1042,14 +1043,14 @@
               const rect = stage.getBoundingClientRect();
               const distance = Math.max(rect.width || state.viewW || window.innerWidth || 1, 1);
               const offset = dir === 'next' ? distance : -distance;
-              const prevTransition = zoomedImage.style.transition;
               zoomedImage.style.transition = 'none';
               state.slideOffset = offset;
               clampPan();
               apply();
               void zoomedImage.offsetWidth;
-              zoomedImage.style.transition = prevTransition;
+              zoomedImage.style.transition = '';
               zoomedImage.style.visibility = '';
+              stage.classList.add('is-sliding', slideClass);
               requestAnimationFrame(() => {
                 state.slideOffset = 0;
                 clampPan();
@@ -1120,7 +1121,6 @@
 
         let animationDone = !resolvedDirection;
         let imageReady = false;
-        let releaseSlide = null;
 
         const finalizeSwap = () => {
           if (slidePrep && activeSlide === slidePrep) {
@@ -1136,8 +1136,6 @@
 
         const maybeFinish = () => {
           if (animationDone && imageReady) {
-            releaseSlide?.();
-            releaseSlide = null;
             finalizeSwap();
           }
         };
@@ -1146,10 +1144,10 @@
           zoomedImage.removeEventListener('error', handleError);
           imageReady = true;
           if (slidePrep) {
-            releaseSlide = slidePrep.start(() => {
+            slidePrep.start(() => {
               animationDone = true;
               maybeFinish();
-            }) || null;
+            });
           } else {
             animationDone = true;
             maybeFinish();
@@ -1197,9 +1195,13 @@
         body.dataset.prevOverflow = body.style.overflow || '';
         body.style.overflow = 'hidden';
         prevActive = opener || document.activeElement;
-        setSlide(index);
-        trapFocus();
-        zoomToggle.focus();
+
+        requestAnimationFrame(() => {
+          measureBase();
+          setSlide(index);
+          trapFocus();
+          zoomToggle?.focus();
+        });
       }
 
       function closeLightbox() {
@@ -1298,9 +1300,15 @@
           } else {
             const dx = current.x - startDrag.x;
             const dy = current.y - startDrag.y;
-            if (Math.abs(dy) <= SWIPE_VERTICAL_LIMIT && Math.abs(dx) >= SWIPE_HORIZONTAL_THRESHOLD) {
+            if (
+              Math.abs(dy) <= SWIPE_VERTICAL_LIMIT &&
+              Math.abs(dx) >= SWIPE_HORIZONTAL_THRESHOLD + HYSTERESIS
+            ) {
               swipeIntent = dx < 0 ? 'next' : 'prev';
-            } else if (Math.abs(dx) < SWIPE_HORIZONTAL_THRESHOLD || Math.abs(dy) > SWIPE_VERTICAL_LIMIT) {
+            } else if (
+              Math.abs(dx) < SWIPE_HORIZONTAL_THRESHOLD ||
+              Math.abs(dy) > SWIPE_VERTICAL_LIMIT
+            ) {
               swipeIntent = null;
             }
           }
