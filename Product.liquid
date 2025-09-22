@@ -413,8 +413,12 @@
     user-select: none;
     -webkit-user-drag: none;
     will-change: transform;
-    transition: transform 0.12s ease;
+    opacity: 1;
+    transition: transform 0.12s ease, opacity 0.24s ease;
     transform-origin: 50% 50%;
+  }
+  .pdp-scope .pdp-zoom-image.is-swapping {
+    opacity: 0;
   }
   .pdp-scope .pdp-lightbox.dragging .pdp-zoom-image {
     cursor: grabbing;
@@ -831,15 +835,19 @@
       }
 
       const body = document.body;
-      const state = { scale: 1, min: 1, max: 4, tx: 0, ty: 0, baseW: 0, baseH: 0, viewW: 0, viewH: 0 };
+      const state = { scale: 1, min: 1, max: 6, tx: 0, ty: 0, baseW: 0, baseH: 0, viewW: 0, viewH: 0 };
       const viewer = { index: 0, isOpen: false };
       const pts = new Map();
       const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
+      const SWIPE_HORIZONTAL_THRESHOLD = 48;
+      const SWIPE_VERTICAL_LIMIT = 40;
+      const quickZoomScale = () => Math.min(3, state.max);
       let images = [];
       let pinchStart = null;
       let raf = null;
       let idleTimer = null;
       let startDrag = null;
+      let swipeIntent = null;
       let focusables = [];
       let firstEl = null;
       let lastEl = null;
@@ -859,8 +867,12 @@
         const contentH = state.baseH * state.scale;
         const maxX = Math.max(0, (contentW - state.viewW) / 2);
         const maxY = Math.max(0, (contentH - state.viewH) / 2);
-        state.tx = clamp(state.tx, -maxX, maxX);
-        state.ty = clamp(state.ty, -maxY, maxY);
+        const allowOvershoot = lightbox.classList.contains('dragging') && state.scale > 1;
+        const overshootFactor = allowOvershoot ? 0.18 : 0;
+        const bufferX = allowOvershoot ? Math.min(state.viewW * overshootFactor, 140) : 0;
+        const bufferY = allowOvershoot ? Math.min(state.viewH * overshootFactor, 140) : 0;
+        state.tx = clamp(state.tx, -maxX - bufferX, maxX + bufferX);
+        state.ty = clamp(state.ty, -maxY - bufferY, maxY + bufferY);
       };
 
       const schedule = () => {
@@ -886,7 +898,7 @@
         if (zoomedImage.naturalWidth && state.baseW) {
           const limitW = zoomedImage.naturalWidth / state.baseW;
           const limitH = zoomedImage.naturalHeight / state.baseH;
-          state.max = Math.max(1, Math.min(4, limitW, limitH));
+          state.max = Math.max(1, Math.min(6, limitW, limitH));
         }
       }
 
@@ -941,9 +953,6 @@
         zoomedImage.alt = item.alt || '';
         zoomedImage.removeAttribute('srcset');
         zoomedImage.removeAttribute('sizes');
-        if (zoomedImage.src !== item.src) {
-          zoomedImage.src = item.src;
-        }
         counter.textContent = `${viewer.index + 1} / ${images.length}`;
         updateDots();
         [viewer.index - 1, viewer.index + 1].forEach((ii) => {
@@ -953,15 +962,40 @@
             preload.src = neighbor.src;
           }
         });
-        if (zoomedImage.complete && zoomedImage.naturalWidth > 0) {
+        const finalizeSwap = () => {
           measureBase();
           resetView();
-        } else {
-          zoomedImage.onload = () => {
-            measureBase();
-            resetView();
-            zoomedImage.onload = null;
+          requestAnimationFrame(() => {
+            zoomedImage.classList.remove('is-swapping');
+          });
+        };
+
+        const beginSwap = () => {
+          zoomedImage.classList.add('is-swapping');
+          const handleLoad = () => {
+            zoomedImage.removeEventListener('error', handleError);
+            finalizeSwap();
           };
+          const handleError = () => {
+            zoomedImage.removeEventListener('load', handleLoad);
+            requestAnimationFrame(() => {
+              zoomedImage.classList.remove('is-swapping');
+            });
+          };
+          zoomedImage.addEventListener('load', handleLoad, { once: true });
+          zoomedImage.addEventListener('error', handleError, { once: true });
+          zoomedImage.src = item.src;
+          if (zoomedImage.complete && zoomedImage.naturalWidth > 0) {
+            handleLoad();
+          }
+        };
+
+        zoomedImage.onload = null;
+        zoomedImage.onerror = null;
+        if (zoomedImage.src !== item.src) {
+          beginSwap();
+        } else {
+          finalizeSwap();
         }
         showUI();
       }
@@ -998,7 +1032,7 @@
         if (state.scale > 1.01 || Math.abs(state.tx) > 1 || Math.abs(state.ty) > 1) {
           resetView();
         } else {
-          zoomAt(0, 0, Math.min(2, state.max));
+          zoomAt(0, 0, quickZoomScale());
         }
       });
       prevBtn.addEventListener('click', () => setSlide(viewer.index - 1));
@@ -1033,7 +1067,7 @@
         const rect = stage.getBoundingClientRect();
         const cx = event.clientX - (rect.left + rect.width / 2);
         const cy = event.clientY - (rect.top + rect.height / 2);
-        const targetScale = state.scale > 1 ? 1 : Math.min(2, state.max);
+        const targetScale = state.scale > 1 ? 1 : quickZoomScale();
         zoomAt(cx, cy, targetScale);
       });
 
@@ -1043,8 +1077,11 @@
         pts.set(event.pointerId, { x: event.clientX, y: event.clientY });
         if (pts.size === 1) {
           startDrag = { x: event.clientX, y: event.clientY, atScale: state.scale };
+          swipeIntent = null;
         }
         if (pts.size === 2) {
+          startDrag = null;
+          swipeIntent = null;
           const [a, b] = [...pts.values()];
           const dx = b.x - a.x;
           const dy = b.y - a.y;
@@ -1064,19 +1101,22 @@
         const current = { x: event.clientX, y: event.clientY };
         pts.set(event.pointerId, current);
 
-        if (pts.size === 1) {
-          if (state.scale === 1 && startDrag) {
+        if (pts.size === 1 && startDrag) {
+          const zoomedNow = state.scale > 1.001;
+          const startedZoomed = startDrag.atScale > 1.001;
+          if (zoomedNow || startedZoomed) {
+            state.tx += current.x - previous.x;
+            state.ty += current.y - previous.y;
+            schedule();
+          } else {
             const dx = current.x - startDrag.x;
             const dy = current.y - startDrag.y;
-            if (Math.abs(dx) > 48 && Math.abs(dy) < 40) {
-              setSlide(viewer.index + (dx < 0 ? 1 : -1));
-              startDrag = { x: current.x, y: current.y, atScale: 1 };
-              return;
+            if (Math.abs(dy) <= SWIPE_VERTICAL_LIMIT && Math.abs(dx) >= SWIPE_HORIZONTAL_THRESHOLD) {
+              swipeIntent = dx < 0 ? 'next' : 'prev';
+            } else if (Math.abs(dx) < SWIPE_HORIZONTAL_THRESHOLD || Math.abs(dy) > SWIPE_VERTICAL_LIMIT) {
+              swipeIntent = null;
             }
           }
-          state.tx += current.x - previous.x;
-          state.ty += current.y - previous.y;
-          schedule();
         } else if (pts.size === 2 && pinchStart) {
           const [a, b] = [...pts.values()];
           const dx = b.x - a.x;
@@ -1089,11 +1129,26 @@
 
       const endPointer = (event) => {
         if (!pts.has(event.pointerId)) return;
+        const dragSnapshot = startDrag;
+        const intent = swipeIntent;
         pts.delete(event.pointerId);
         if (pts.size < 2) pinchStart = null;
+
         if (!pts.size) {
+          swipeIntent = null;
+          if (dragSnapshot && dragSnapshot.atScale === 1 && state.scale === 1 && intent) {
+            setSlide(viewer.index + (intent === 'next' ? 1 : -1));
+          }
           lightbox.classList.remove('dragging');
           startDrag = null;
+          schedule();
+        } else if (pts.size === 1) {
+          const [, point] = pts.entries().next().value;
+          startDrag = { x: point.x, y: point.y, atScale: state.scale };
+          swipeIntent = null;
+        } else {
+          startDrag = null;
+          swipeIntent = null;
         }
       };
       stage.addEventListener('pointerup', endPointer);
