@@ -200,13 +200,13 @@
       <div class="counter" id="pdp-zoomCounter" aria-live="polite"></div>
       <div class="controls">
         <button class="btn" type="button" id="pdp-zoomToggle" aria-label="Zoom in">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
             <path d="M10 4V16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             <path d="M4 10H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
         </button>
         <button class="btn" type="button" id="pdp-closeZoom" aria-label="Close">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
             <path d="M5 5L15 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             <path d="M15 5L5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
@@ -214,12 +214,12 @@
       </div>
       <div class="side-nav">
         <button class="btn" type="button" id="pdp-prevZoom" aria-label="Previous image">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
             <path d="M12.5 5L7.5 10L12.5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
         <button class="btn" type="button" id="pdp-nextZoom" aria-label="Next image">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
             <path d="M7.5 5L12.5 10L7.5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
@@ -478,8 +478,11 @@
     box-shadow: none;
   }
   .pdp-scope .pdp-lightbox .btn svg {
-    width: 20px;
-    height: 20px;
+    width: 15px;
+    height: 15px;
+  }
+  .pdp-scope .pdp-lightbox .controls .btn {
+    margin: 0;
   }
   .pdp-scope .pdp-lightbox .btn:hover { background: var(--pdp-zoom-btn-bg-hover); }
   .pdp-scope .pdp-lightbox .btn:active { transform: scale(0.96); }
@@ -816,7 +819,7 @@
       const dotsWrap = scope.querySelector('#pdp-zoomDots');
       const counter = scope.querySelector('#pdp-zoomCounter');
       const iconZoomIn = zoomToggle ? zoomToggle.innerHTML.trim() : '';
-      const iconZoomReset = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M4 10H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+      const iconZoomReset = '<svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M4 10H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
 
       if (!lightbox || !stage || !zoomedImage || !zoomToggle || !closeBtn || !prevBtn || !nextBtn || !dotsWrap || !counter) {
         return {
