@@ -1020,7 +1020,11 @@
           clone.setAttribute('aria-hidden', 'true');
           clone.classList.add('slide-clone');
           clone.src = zoomedImage.currentSrc || zoomedImage.src;
-          clone.style.transform = zoomedImage.style.transform;
+          const applyClone = (deltaX = 0) => {
+            clone.style.transform =
+              `translate3d(-50%, -50%, 0) translate3d(${state.tx + deltaX}px, ${state.ty}px, 0) scale(${state.scale})`;
+          };
+          applyClone();
           stage.appendChild(clone);
           zoomedImage.style.visibility = 'hidden';
           let disposed = false;
@@ -1057,11 +1061,12 @@
                 apply();
               });
 
-              clone.style.transition = 'transform 0.36s ease';
-              clone.style.transform = `translate3d(${state.tx}px, ${state.ty}px, 0) scale(${state.scale})`;
+              clone.style.transition = 'none';
+              applyClone();
               void clone.offsetWidth;
+              clone.style.transition = '';
               requestAnimationFrame(() => {
-                clone.style.transform = `translate3d(${state.tx - offset}px, ${state.ty}px, 0) scale(${state.scale})`;
+                applyClone(-offset);
               });
 
               const finish = () => {
